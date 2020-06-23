@@ -7,7 +7,7 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20180824154052-36585635cb64
 	github.com/garyburd/go-oauth v0.0.0-20180319155456-bca2e7f09a17
 	github.com/go-kit/kit v0.7.0
-	github.com/go-sql-driver/mysql v1.4.0 // indirect
+	github.com/go-sql-driver/mysql v1.4.0
 	github.com/go-stack/stack v1.7.0 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
