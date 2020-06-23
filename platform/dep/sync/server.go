@@ -8,7 +8,7 @@ import (
 	"github.com/micromdm/micromdm/pkg/httputil"
 )
 
-func NewService(syncer Syncer, db DB) *DEPSyncService {
+func NewService(syncer Syncer, db Store) *DEPSyncService {
 	return &DEPSyncService{syncer: syncer, db: db}
 }
 

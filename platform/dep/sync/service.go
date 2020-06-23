@@ -12,14 +12,14 @@ type Service interface {
 	RemoveAutoAssigner(context.Context, string) error
 }
 
-type DB interface {
+type Store interface {
 	SaveAutoAssigner(ctx context.Context, a *AutoAssigner) error
 	LoadAutoAssigners(ctx context.Context) ([]AutoAssigner, error)
 	DeleteAutoAssigner(ctx context.Context, filter string) error
 }
 
 type DEPSyncService struct {
-	db     DB
+	db     Store
 	syncer Syncer
 }
 

@@ -3,8 +3,7 @@ package challenge
 import (
 	"context"
 	"errors"
-
-	challengestore "github.com/micromdm/scep/challenge/bolt"
+	"github.com/micromdm/scep/challenge"
 )
 
 type Service interface {
@@ -12,7 +11,7 @@ type Service interface {
 }
 
 type ChallengeService struct {
-	scepChallengeStore *challengestore.Depot
+	scepChallengeStore challenge.Store
 }
 
 func (c *ChallengeService) SCEPChallenge(ctx context.Context) (string, error) {
@@ -22,7 +21,7 @@ func (c *ChallengeService) SCEPChallenge(ctx context.Context) (string, error) {
 	return c.scepChallengeStore.SCEPChallenge()
 }
 
-func NewService(cs *challengestore.Depot) *ChallengeService {
+func NewService(cs challenge.Store) *ChallengeService {
 	return &ChallengeService{
 		scepChallengeStore: cs,
 	}

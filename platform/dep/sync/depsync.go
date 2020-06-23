@@ -25,7 +25,7 @@ const (
 
 type Syncer interface{ SyncNow() }
 
-type WatcherDB interface {
+type WatcherStore interface {
     LoadCursor(ctx context.Context) (*Cursor, error)
     SaveCursor(ctx context.Context, c Cursor) error
     LoadAutoAssigners(ctx context.Context) ([]AutoAssigner, error)
@@ -37,14 +37,14 @@ type Watcher struct {
 	client Client
 
 	publisher pubsub.Publisher
-	db        WatcherDB
+	db        WatcherStore
 	startSync chan bool
 	syncNow   chan bool
 
 	cursor Cursor
 }
 
-func NewWatcher(db WatcherDB, pub pubsub.PublishSubscriber, opts ...Option) (*Watcher, error) {
+func NewWatcher(db WatcherStore, pub pubsub.PublishSubscriber, opts ...Option) (*Watcher, error) {
 	w := Watcher{
 		logger:    log.NewNopLogger(),
 		db:        db,

@@ -3,6 +3,7 @@ package enroll
 import (
 	"bytes"
 	"crypto/x509"
+	"github.com/micromdm/scep/challenge"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/micromdm/micromdm/platform/config"
 	"github.com/micromdm/micromdm/platform/profile"
 	"github.com/micromdm/micromdm/platform/pubsub"
-	challengestore "github.com/micromdm/scep/challenge/bolt"
 )
 
 const (
@@ -30,7 +30,7 @@ type Service interface {
 	OTAPhase3(ctx context.Context) (profile.Mobileconfig, error)
 }
 
-func NewService(topic TopicProvider, sub pubsub.Subscriber, scepURL, scepChallenge, url, tlsCertPath, scepSubject string, profileDB profile.Store, cs *challengestore.Depot) (Service, error) {
+func NewService(topic TopicProvider, sub pubsub.Subscriber, scepURL, scepChallenge, url, tlsCertPath, scepSubject string, profileStore profile.Store, cs challenge.Store) (Service, error) {
 	var tlsCert []byte
 	var err error
 
@@ -67,7 +67,7 @@ func NewService(topic TopicProvider, sub pubsub.Subscriber, scepURL, scepChallen
 		SCEPChallenge:      scepChallenge,
 		SCEPChallengeStore: cs,
 		TLSCert:            tlsCert,
-		ProfileDB:          profileDB,
+		ProfileStore:       profileStore,
 		Topic:              pushTopic,
 		topicProvier:       topic,
 	}
@@ -110,10 +110,10 @@ type service struct {
 	URL                string
 	SCEPURL            string
 	SCEPChallenge      string
-	SCEPChallengeStore *challengestore.Depot
+	SCEPChallengeStore challenge.Store
 	SCEPSubject        [][][]string
 	TLSCert            []byte
-	ProfileDB          profile.Store
+	ProfileStore       profile.Store
 
 	topicProvier TopicProvider
 
@@ -146,7 +146,7 @@ func profileOrPayloadToMobileconfig(in interface{}) (profile.Mobileconfig, error
 }
 
 func (svc *service) findOrMakeMobileconfig(ctx context.Context, id string, f interface{}) (profile.Mobileconfig, error) {
-	p, err := svc.ProfileDB.ProfileById(ctx, id)
+	p, err := svc.ProfileStore.ProfileById(ctx, id)
 	if err != nil {
 		if profile.IsNotFound(err) {
 			profile, err := profileOrPayloadFromFunc(f)

@@ -14,19 +14,19 @@ import (
 	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
-type DeviceWorkerStore interface {
+type WorkerStore interface {
 	Save(ctx context.Context, d *Device) error
 	DeviceByUDID(ctx context.Context, udid string) (*Device, error)
 	DeviceBySerial(ctx context.Context, serial string) (*Device, error)
 }
 
 type Worker struct {
-	db     DeviceWorkerStore
+	db     WorkerStore
 	ps     pubsub.PublishSubscriber
 	logger log.Logger
 }
 
-func NewWorker(db DeviceWorkerStore, ps pubsub.PublishSubscriber, logger log.Logger) *Worker {
+func NewWorker(db WorkerStore, ps pubsub.PublishSubscriber, logger log.Logger) *Worker {
 	return &Worker{
 		db:     db,
 		ps:     ps,
@@ -260,7 +260,7 @@ func (w *Worker) updateFromAuthenticate(ctx context.Context, message []byte) err
 	return errors.Wrapf(err, "saving updated device for authenticate event")
 }
 
-func getOrCreateDevice(ctx context.Context, db DeviceWorkerStore, serial, udid string) (dev *Device, reenrolling bool, err error) {
+func getOrCreateDevice(ctx context.Context, db WorkerStore, serial, udid string) (dev *Device, reenrolling bool, err error) {
 	if udid != "" {
 		// first try to fetch a device by UDID.
 		// If the device was previously enrolled it will exist.
@@ -281,7 +281,7 @@ func getOrCreateDevice(ctx context.Context, db DeviceWorkerStore, serial, udid s
 	return dev, false, err
 }
 
-func getOrCreateDeviceBySerial(ctx context.Context, db DeviceWorkerStore, serial string) (*Device, error) {
+func getOrCreateDeviceBySerial(ctx context.Context, db WorkerStore, serial string) (*Device, error) {
 	bySerial, err := db.DeviceBySerial(ctx, serial)
 	if err == nil && bySerial != nil {
 		return bySerial, nil

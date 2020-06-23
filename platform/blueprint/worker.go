@@ -16,7 +16,7 @@ import (
 	"github.com/micromdm/micromdm/platform/user"
 )
 
-type BlueprintWorkerStore interface {
+type WorkerStore interface {
 	BlueprintsByApplyAt(ctx context.Context, action string) ([]Blueprint, error)
 }
 
@@ -29,7 +29,7 @@ type ProfileStore interface {
 }
 
 func NewWorker(
-	db BlueprintWorkerStore,
+	db WorkerStore,
 	userDB UserStore,
 	profileDB ProfileStore,
 	cmdsvc command.Service,
@@ -47,7 +47,7 @@ func NewWorker(
 }
 
 type Worker struct {
-	db        BlueprintWorkerStore
+	db        WorkerStore
 	userDB    UserStore
 	profileDB ProfileStore
 	ps        pubsub.Subscriber

@@ -1,10 +1,13 @@
 package server
 
 import (
-    "fmt"
-	
 	"context"
 	"crypto/x509"
+	"fmt"
+	"github.com/jmoiron/sqlx"
+	"github.com/micromdm/micromdm/platform/blueprint"
+	"github.com/micromdm/micromdm/platform/user"
+	"github.com/micromdm/scep/challenge"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -19,8 +22,7 @@ import (
 	challengestore "github.com/micromdm/scep/challenge/bolt"
 	scep "github.com/micromdm/scep/server"
 	"github.com/pkg/errors"
-	
-	"github.com/jmoiron/sqlx"
+
 	"github.com/kolide/kit/dbutil"
 
 	"github.com/micromdm/micromdm/dep"
@@ -33,11 +35,11 @@ import (
 	"github.com/micromdm/micromdm/platform/config"
 	configbuiltin "github.com/micromdm/micromdm/platform/config/builtin"
 	configmysql "github.com/micromdm/micromdm/platform/config/mysql"
-	
+
 	"github.com/micromdm/micromdm/platform/dep/sync"
 	syncbuiltin "github.com/micromdm/micromdm/platform/dep/sync/builtin"
 	syncmysql "github.com/micromdm/micromdm/platform/dep/sync/mysql"
-	
+
 	"github.com/micromdm/micromdm/platform/device"
 	devicebuiltin "github.com/micromdm/micromdm/platform/device/builtin"
 	devicemysql "github.com/micromdm/micromdm/platform/device/mysql"
@@ -46,12 +48,11 @@ import (
 	profilemysql "github.com/micromdm/micromdm/platform/profile/mysql"
 	"github.com/micromdm/micromdm/platform/pubsub"
 	"github.com/micromdm/micromdm/platform/pubsub/inmem"
-	
+
 	"github.com/micromdm/micromdm/platform/queue"
 	queueBuiltin "github.com/micromdm/micromdm/platform/queue/builtin"
 	queueMysql "github.com/micromdm/micromdm/platform/queue/mysql"
-	
-	
+
 	block "github.com/micromdm/micromdm/platform/remove"
 	blockbuiltin "github.com/micromdm/micromdm/platform/remove/builtin"
 	blockmysql "github.com/micromdm/micromdm/platform/remove/mysql"
@@ -59,59 +60,64 @@ import (
 )
 
 type Server struct {
-	ConfigPath        string
-	Depsim            string
-	PubClient         pubsub.PublishSubscriber
-	DB                *bolt.DB
-	ServerPublicURL   string
-	SCEPChallenge     string
-	SCEPClientValidity int
-	TLSCertPath       string
-	
+	ConfigPath          string
+	Depsim              string
+	ServerPublicURL     string
+	SCEPChallenge       string
+	SCEPClientValidity  int
+	TLSCertPath         string
 	UseDynSCEPChallenge bool
 	GenDynSCEPChallenge bool
-	SCEPChallengeDepot  *challengestore.Depot
-	SCEPBuiltin	      *scepbuiltin.Depot
-	SCEPMysqlDB       *scepmysql.Depot
-	
-	SCEPDB			  scepstore.Store
-	ProfileDB         profile.Store
-	ConfigDB          config.Store
-	RemoveDB          block.Store
-	CommandWebhookURL string
-	DEPClient         *dep.Client
-	NoCmdHistory       bool
-	
-	SyncBuiltin       *syncbuiltin.DB
-	SyncMysqlDB       *syncmysql.Mysql
-	
-	MysqlDB			  *sqlx.DB
-	MysqlUsername     string
-	MysqlPassword     string
-	MysqlDatabase     string
-	MysqlHost 	      string
-	MysqlPort 	      string
+	CommandWebhookURL   string
+	NoCmdHistory        bool
+	MysqlUsername       string
+	MysqlPassword       string
+	MysqlDatabase       string
+	MysqlHost           string
+	MysqlPort           string
 
-	APNSPushService apns.Service
-	CommandService  command.Service
-	MDMService      mdm.Service
-	EnrollService   enroll.Service
-	SCEPService     scep.Service
-	ConfigService   config.Service
+	Datastore            DatastoreType
+	BoltDB               *bolt.DB
+	MysqlDB              *sqlx.DB
 
-	WebhooksHTTPClient *http.Client
+	BlueprintStore       blueprint.Store
+	BlueprintWorkerStore blueprint.WorkerStore
+	ConfigStore          config.Store
+	DEPSyncStore         sync.Store
+	DEPSyncWatcherStore  sync.WatcherStore
+	DeviceStore          device.Store
+	DeviceWorkerStore    device.WorkerStore
+	ProfileStore         profile.Store
+	RemoveStore          block.Store
+	SCEPChallengeStore   challenge.Store
+	SCEPStore            scepstore.Store
+	UserStore            user.Store
+	UserWorkerStore      user.WorkerStore
+
+	APNSPushService      apns.Service
+	CommandService       command.Service
+	ConfigService        config.Service
+	EnrollService        enroll.Service
+	MDMService           mdm.Service
+	SCEPService          scep.Service
+
+	DEPClient            *dep.Client
+	PubClient            pubsub.PublishSubscriber
+	WebhooksHTTPClient   *http.Client
 }
+
+type DatastoreType int
+const (
+	BoltDB DatastoreType = iota
+	MySQL
+)
 
 func (c *Server) Setup(logger log.Logger) error {
 	if err := c.setupPubSub(); err != nil {
 		return err
 	}
 
-	if err := c.setupBolt(); err != nil {
-		return err
-	}
-
-	if err := c.setupMysql(); err != nil {
+	if err := c.setDatastore(); err != nil {
 		return err
 	}
 
@@ -157,20 +163,20 @@ func (c *Server) Setup(logger log.Logger) error {
 }
 
 func (c *Server) setupProfileDB() error {
-	var profileDB profile.Store
+	var profileStore profile.Store
 	var err error
 	
 	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
-		profileDB, err = profilemysql.NewDB(c.MysqlDB)
+	if c.Datastore == MySQL {
+		profileStore, err = profilemysql.NewDB(c.MysqlDB)
 	} else {
-		profileDB, err = profilebuiltin.NewDB(c.DB)
+		profileStore, err = profilebuiltin.NewDB(c.BoltDB)
 	}
 	
 	if err != nil {
 		return err
 	}
-	c.ProfileDB = profileDB
+	c.ProfileStore = profileStore
 	return nil
 }
 
@@ -191,20 +197,18 @@ func (c *Server) setupWebhooks(logger log.Logger) error {
 }
 
 func (c *Server) setupRemoveService() error {
-	var removeDB block.Store
+	var removeStore block.Store
 	var err error
 
-	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
-		removeDB, err = blockmysql.NewDB(c.MysqlDB)
+	if c.Datastore == MySQL {
+		removeStore, err = blockmysql.NewDB(c.MysqlDB)
 	} else {
-		removeDB, err = blockbuiltin.NewDB(c.DB)
+		removeStore, err = blockbuiltin.NewDB(c.BoltDB)
 	}
-	
 	if err != nil {
 		return err
 	}
-	c.RemoveDB = removeDB
+	c.RemoveStore = removeStore
 	return nil
 }
 
@@ -219,11 +223,10 @@ func (c *Server) setupCommandService() error {
 
 func (c *Server) setupCommandQueue(logger log.Logger) error {
 	var q queue.Store
-	var devDB device.UDIDCertAuthStore
+	var udidCertAuthStore device.UDIDCertAuthStore
 	var err error
 
-	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
+	if c.Datastore == MySQL {
 		opts := []queueMysql.Option{queueMysql.WithLogger(logger)}
 		if c.NoCmdHistory {
 			opts = append(opts, queueMysql.WithoutHistory())
@@ -234,41 +237,55 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 			return err
 		}
 
-		devDB, err = devicemysql.NewDB(c.MysqlDB)
+		udidCertAuthStore, err = devicemysql.NewDB(c.MysqlDB)
+		if err != nil {
+			return errors.Wrap(err, "new device db")
+		}
 	} else {
 		opts := []queueBuiltin.Option{queueBuiltin.WithLogger(logger)}
 		if c.NoCmdHistory {
 			opts = append(opts, queueBuiltin.WithoutHistory())
 		}
 		
-		q, err = queueBuiltin.NewQueue(c.DB, c.PubClient, opts...)
+		q, err = queueBuiltin.NewQueue(c.BoltDB, c.PubClient, opts...)
 		if err != nil {
 			return err
 		}
 
-		devDB, err = devicebuiltin.NewDB(c.DB)
-	}
-
-	
-	if err != nil {
-		return errors.Wrap(err, "new device db")
+		udidCertAuthStore, err = devicebuiltin.NewDB(c.BoltDB)
+		if err != nil {
+			return errors.Wrap(err, "new device db")
+		}
 	}
 
 	var mdmService mdm.Service
 	{
 		svc := mdm.NewService(c.PubClient, q)
 		mdmService = svc
-		mdmService = block.RemoveMiddleware(c.RemoveDB)(mdmService)
+		mdmService = block.RemoveMiddleware(c.RemoveStore)(mdmService)
 
 		udidauthLogger := log.With(logger, "component", "udidcertauth")
-		mdmService = device.UDIDCertAuthMiddleware(devDB, udidauthLogger)(mdmService)
+		mdmService = device.UDIDCertAuthMiddleware(udidCertAuthStore, udidauthLogger)(mdmService)
 	
 		verifycertLogger := log.With(logger, "component", "verifycert")
-		mdmService = VerifyCertificateMiddleware(c.SCEPDB, verifycertLogger)(mdmService)
+		mdmService = VerifyCertificateMiddleware(c.SCEPStore, verifycertLogger)(mdmService)
 	}
 	c.MDMService = mdmService
 
 	return nil
+}
+
+func (c *Server) setDatastore() error {
+	// If Mysql is set up, use Mysql, else use Bolt as Fallback
+	if c.MysqlUsername != "" && c.MysqlPassword != "" && c.MysqlHost != "" && c.MysqlPort != "" && c.MysqlDatabase != "" {
+		c.Datastore = MySQL
+		err := c.setupMysql()
+		return err
+	}
+
+	c.Datastore = BoltDB
+	err := c.setupBolt()
+	return err
 }
 
 func (c *Server) setupBolt() error {
@@ -279,18 +296,17 @@ func (c *Server) setupBolt() error {
 		return errors.Wrap(err, "opening boltdb")
 	}
 
-	c.DB = db
+	c.BoltDB = db
 
 	return nil
 }
 
 func (c *Server) setupMysql() error {
 	
-	if (c.MysqlUsername == "" || c.MysqlPassword == "" || c.MysqlHost == "" || c.MysqlPort == "" || c.MysqlDatabase == "") {
+	if c.MysqlUsername == "" || c.MysqlPassword == "" || c.MysqlHost == "" || c.MysqlPort == "" || c.MysqlDatabase == "" {
 		return nil
 	}
 
-	
 	db, err := dbutil.OpenDBX(
 		"mysql",
 //		"micromdm:micromdm@tcp(127.0.0.1:3306)/micromdm_test?parseTime=true",
@@ -316,66 +332,55 @@ type pushServiceCert struct {
 }
 
 func (c *Server) setupConfigStore() error {
-	var db config.Store
+	var store config.Store
 	var err error
 
 	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
-		db, err = configmysql.NewDB(c.MysqlDB, c.PubClient)
+	if c.Datastore == MySQL {
+		store, err = configmysql.NewDB(c.MysqlDB, c.PubClient)
 	} else {
-		db, err = configbuiltin.NewDB(c.DB, c.PubClient)
+		store, err = configbuiltin.NewDB(c.BoltDB, c.PubClient)
 	}
 	
 	if err != nil {
 		return err
 	}
-	c.ConfigDB = db
-	c.ConfigService = config.New(db)
+	c.ConfigStore = store
+	c.ConfigService = config.New(store)
 
 	return nil
 }
 
 func (c *Server) setupPushService(logger log.Logger) error {
-	var service apns.Service
-
-	// Code duplication is needed unfortunately...
-	// workerStore may be of different types. (Mysql vs. Bolt)
-	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
-		workerStore, err := apnsmysql.NewDB(c.MysqlDB, c.PubClient)
+	var store apns.Store
+	var workerStore apns.WorkerStore
+	if c.Datastore == MySQL {
+		db, err := apnsmysql.NewDB(c.MysqlDB, c.PubClient)
 		if err != nil {
 			return err
 		}
-	
-		service, err := apns.New(workerStore, c.ConfigDB, c.PubClient)
-
-		if err != nil {
-			return errors.Wrap(err, "starting micromdm push service")
-		}
-		c.APNSPushService = apns.LoggingMiddleware(
-			log.With(level.Info(logger), "component", "apns"),
-		)(service)
-		
-		pushinfoWorker := apns.NewWorker(workerStore, c.PubClient, logger)
-		go pushinfoWorker.Run(context.Background())
-		
+		store = db
+		workerStore = db
 	} else {
-		workerStore, err := apnsbuiltin.NewDB(c.DB, c.PubClient)
+		db, err := apnsbuiltin.NewDB(c.BoltDB, c.PubClient)
 		if err != nil {
 			return err
 		}
-		service, err = apns.New(workerStore, c.ConfigDB, c.PubClient)
-
-		if err != nil {
-			return errors.Wrap(err, "starting micromdm push service")
-		}
-		c.APNSPushService = apns.LoggingMiddleware(
-			log.With(level.Info(logger), "component", "apns"),
-		)(service)
-
-		pushinfoWorker := apns.NewWorker(workerStore, c.PubClient, logger)
-		go pushinfoWorker.Run(context.Background())
+		store = db
+		workerStore = db
 	}
+
+	service, err := apns.New(store, c.ConfigStore, c.PubClient)
+	if err != nil {
+		return errors.Wrap(err, "starting micromdm push service")
+	}
+
+	c.APNSPushService = apns.LoggingMiddleware(
+		log.With(level.Info(logger), "component", "apns"),
+	)(service)
+
+	worker := apns.NewWorker(workerStore, c.PubClient, logger)
+	go worker.Run(context.Background())
 
 	return nil
 }
@@ -386,23 +391,23 @@ func (c *Server) setupEnrollmentService() error {
 		err                    error
 	)
 
-	chalStore := c.SCEPChallengeDepot
+	challengeStore := c.SCEPChallengeStore
 	if !c.GenDynSCEPChallenge {
-		chalStore = nil
+		challengeStore = nil
 	}
 
 	// TODO: clean up order of inputs. Maybe pass *SCEPConfig as an arg?
 	// but if you do, the packages are coupled, better not.
 	c.EnrollService, err = enroll.NewService(
-		c.ConfigDB,
+		c.ConfigStore,
 		c.PubClient,
 		c.ServerPublicURL+"/scep",
 		c.SCEPChallenge,
 		c.ServerPublicURL,
 		c.TLSCertPath,
 		SCEPCertificateSubject,
-		c.ProfileDB,
-		chalStore,
+		c.ProfileStore,
+		challengeStore,
 	)
 	return errors.Wrap(err, "setting up enrollment service")
 }
@@ -417,7 +422,7 @@ func (c *Server) setupDepClient() error {
 
 	// try getting the oauth config from bolt
 	ctx := context.Background()
-	tokens, err := c.ConfigDB.DEPTokens(ctx)
+	tokens, err := c.ConfigStore.DEPTokens(ctx)
 	if err != nil {
 		return err
 	}
@@ -462,36 +467,32 @@ func (c *Server) CreateDEPSyncer(logger log.Logger) (sync.Syncer, error) {
 	if client != nil {
 		opts = append(opts, sync.WithClient(client))
 	}
-	
-	
+
 	var err error
-	
-	if c.MysqlDB != nil {
-		syncdb, err := syncmysql.NewDB(c.MysqlDB)
+	if c.Datastore == MySQL {
+		db, err := syncmysql.NewDB(c.MysqlDB)
 		if err != nil {
 			return nil, err
 		}
 
-		c.SyncMysqlDB = syncdb
+		c.DEPSyncStore = db
+		c.DEPSyncWatcherStore = db
 	} else {
-		syncdb, err := syncbuiltin.NewDB(c.DB)
+		db, err := syncbuiltin.NewDB(c.BoltDB)
 		if err != nil {
 			return nil, err
 		}
 
-		c.SyncBuiltin = syncdb
+		c.DEPSyncStore = db
+		c.DEPSyncWatcherStore = db
 	}
 	
 	var syncer sync.Syncer
-	if c.SyncMysqlDB != nil {
-		syncer, err = sync.NewWatcher(c.SyncMysqlDB, c.PubClient, opts...)
-	} else {
-		syncer, err = sync.NewWatcher(c.SyncBuiltin, c.PubClient, opts...)
-	}
-	
+	syncer, err = sync.NewWatcher(c.DEPSyncWatcherStore, c.PubClient, opts...)
 	if err != nil {
 		return nil, err
 	}
+
 	return syncer, nil
 }
 
@@ -503,58 +504,42 @@ func (c *Server) setupSCEP(logger log.Logger) error {
 		scep.ClientValidity(c.SCEPClientValidity),
 	}
 	
-	var scepChalOpt scep.ServiceOption
+	var scepChallengeOption scep.ServiceOption
 	if c.UseDynSCEPChallenge {
-		c.SCEPChallengeDepot, err = challengestore.NewBoltDepot(c.DB)
+		c.SCEPChallengeStore, err = challengestore.NewBoltDepot(c.BoltDB)
 		if err != nil {
 			return err
 		}
-		scepChalOpt = scep.WithDynamicChallenges(c.SCEPChallengeDepot)
+		scepChallengeOption = scep.WithDynamicChallenges(c.SCEPChallengeStore)
 	} else {
-		scepChalOpt = scep.ChallengePassword(c.SCEPChallenge)
+		scepChallengeOption = scep.ChallengePassword(c.SCEPChallenge)
 	}
-	opts = append(opts, scepChalOpt)
+	opts = append(opts, scepChallengeOption)
 	
 	// If Mysql is set up, use Mysql, else use Bolt as Fallback
-	if c.MysqlDB != nil {
-		c.SCEPMysqlDB, err = scepmysql.NewDB(c.MysqlDB)
-		store = c.SCEPMysqlDB
-		
-		key, err := store.CreateOrLoadKey(2048)
-		if err != nil {
-			return err
-		}
-	
-		fmt.Println("CreateOrLoadCA")
-		_, err = store.CreateOrLoadCA(key, 5, "MicroMDM", "US")
-		if err != nil {
-			return err
-		}
-	
-		c.SCEPService, err = scep.NewService(store, opts...)
+	if c.Datastore == MySQL {
+		store, err = scepmysql.NewDB(c.MysqlDB)
 	} else {
-		c.SCEPBuiltin, err = scepbuiltin.NewDB(c.DB)
-		store = c.SCEPBuiltin
-		
-		key, err := store.CreateOrLoadKey(2048)
-		if err != nil {
-			return err
-		}
-	
-		fmt.Println("CreateOrLoadCA")
-		_, err = store.CreateOrLoadCA(key, 5, "MicroMDM", "US")
-		if err != nil {
-			return err
-		}
-		
-		c.SCEPService, err = scep.NewService(store, opts...)
+		store, err = scepbuiltin.NewDB(c.BoltDB)
 	}
-	
+
+	key, err := store.CreateOrLoadKey(2048)
 	if err != nil {
 		return err
 	}
 
-	c.SCEPDB = store
+	fmt.Println("CreateOrLoadCA")
+	_, err = store.CreateOrLoadCA(key, 5, "MicroMDM", "US")
+	if err != nil {
+		return err
+	}
+
+	c.SCEPService, err = scep.NewService(store, opts...)
+	if err != nil {
+		return err
+	}
+
+	c.SCEPStore = store
 	c.SCEPService = scep.NewLoggingService(logger, c.SCEPService)
 
 	return nil
