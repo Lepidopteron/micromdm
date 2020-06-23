@@ -33,7 +33,7 @@ username=groob
 # add your remote/upstream
 git remote add $username git@github.com:groob/micromdm.git
 
-# update from origin/master
+# update from origin/main
 git pull --rebase
 
 # create a branch

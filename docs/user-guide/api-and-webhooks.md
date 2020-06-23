@@ -1,6 +1,6 @@
 MicroMDM is intended to be a dependency for implementing a higher level workflow. To do so, it exposes all its capabilities through an HTTP API and also forwards all the device responses to an HTTP endpoint of your choice. 
 
-For examples of what you can do with the API, reference the [tools/api](https://github.com/micromdm/micromdm/tree/master/tools/api) directory of the micromdm repository. The directory includes executable `curl` examples of API requests which you can run, but also reference when implementing an API client in another language.
+For examples of what you can do with the API, reference the [tools/api](https://github.com/micromdm/micromdm/tree/main/tools/api) directory of the micromdm repository. The directory includes executable `curl` examples of API requests which you can run, but also reference when implementing an API client in another language.
 
 Throughout this document we will reference the provided scripts as shorthand for making API requests.
 
