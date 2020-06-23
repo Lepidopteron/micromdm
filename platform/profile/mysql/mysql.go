@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"strings"
 	"database/sql"
 	"fmt"
 
@@ -57,11 +56,9 @@ func (d *Mysql) List(ctx context.Context) ([]profile.Profile, error) {
 }
 
 func (d *Mysql) Save(ctx context.Context, p *profile.Profile) error {
-
 	_, err := d.ProfileById(ctx,p.Identifier)
 	// Empty object => insert
-	if (err != nil) {
-		
+	if err != nil {
 		query, args, err := sq.StatementBuilder.
 			PlaceholderFormat(sq.Question).
 			Insert(tableName).
@@ -70,33 +67,25 @@ func (d *Mysql) Save(ctx context.Context, p *profile.Profile) error {
 				p.Identifier,
 				p.Mobileconfig,
 			).
-			//Suffix(updateQuery).
 			ToSql()
 		
-		var all_args = append(args, args...)
 		if err != nil {
 			return errors.Wrap(err, "building profile save query")
 		}
 		
-		_, err = d.db.ExecContext(ctx, query, all_args...)
+		_, err = d.db.ExecContext(ctx, query, args...)
 		
 	} else {
 		// Update existing entry
 		updateQuery, args_update, err := sq.StatementBuilder.
 			PlaceholderFormat(sq.Question).
 			Update(tableName).
-			//Prefix("ON DUPLICATE KEY").
-			//Set("identifier", p.Identifier).
 			Set("mobileconfig", p.Mobileconfig).
 			Where("identifier LIKE ?", fmt.Sprint("", p.Identifier, "")).
 			ToSql()
 		if err != nil {
 			return errors.Wrap(err, "building update query for device save")
 		}
-		
-		// MySql Convention
-		// Replace "ON DUPLICATE KEY UPDATE TABLE_NAME SET" to "ON DUPLICATE KEY UPDATE"
-		updateQuery = strings.Replace(updateQuery, tableName+" SET ", "", -1)
 		
 		_, err = d.db.ExecContext(ctx, updateQuery, args_update...)
 	}
@@ -110,7 +99,6 @@ func (d *Mysql) ProfileById(ctx context.Context, id string) (*profile.Profile, e
 		Select(columns()...).
 		From(tableName).
 		Where("identifier LIKE ?", fmt.Sprint("", id, "")).
-		//Where(sq.Eq{"identifier": id}).
 		ToSql()
 	
 	if err != nil {
@@ -131,7 +119,6 @@ func (d *Mysql) Delete(ctx context.Context, id string) error {
 		PlaceholderFormat(sq.Question).
 		Delete(tableName).
 		Where("identifier LIKE ?", fmt.Sprint("", id, "")).
-		//Where(sq.Eq{"identifier": id}).		
 		ToSql()
 	if err != nil {
 		return errors.Wrap(err, "building sql")
