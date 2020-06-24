@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	userbuiltin "github.com/micromdm/micromdm/platform/user/builtin"
+	"github.com/micromdm/micromdm/datastore/schema"
 	"io"
 	stdlog "log"
 	"net/http"
@@ -34,7 +34,6 @@ import (
 	"github.com/micromdm/micromdm/platform/appstore"
 	appsbuiltin "github.com/micromdm/micromdm/platform/appstore/builtin"
 	"github.com/micromdm/micromdm/platform/blueprint"
-	blueprintbuiltin "github.com/micromdm/micromdm/platform/blueprint/builtin"
 	"github.com/micromdm/micromdm/platform/challenge"
 	"github.com/micromdm/micromdm/platform/command"
 	"github.com/micromdm/micromdm/platform/config"
@@ -42,9 +41,6 @@ import (
 	"github.com/micromdm/micromdm/platform/dep/sync"
 
 	"github.com/micromdm/micromdm/platform/device"
-	devicebuiltin "github.com/micromdm/micromdm/platform/device/builtin"
-	devicemysql "github.com/micromdm/micromdm/platform/device/mysql"
-
 	"github.com/micromdm/micromdm/platform/profile"
 	block "github.com/micromdm/micromdm/platform/remove"
 	"github.com/micromdm/micromdm/platform/user"
@@ -171,7 +167,7 @@ func serve(args []string) error {
 
 	var removeService block.Service
 	{
-		svc, err := block.New(sm.RemoveStore)
+		svc, err := block.New(sm.Datastore.RemoveStore)
 		if err != nil {
 			stdlog.Fatal(err)
 		}
@@ -179,58 +175,21 @@ func serve(args []string) error {
 	}
 
 	// Device
-	if sm.Datastore == server.MySQL {
-		db, err := devicemysql.NewDB(sm.MysqlDB)
-		if err != nil {
-			stdlog.Fatal(err)
-		}
-		sm.DeviceStore = db
-		sm.DeviceWorkerStore = db
-	} else {
-		db, err := devicebuiltin.NewDB(sm.BoltDB)
-		if err != nil {
-			stdlog.Fatal(err)
-		}
-		sm.DeviceStore = db
-		sm.DeviceWorkerStore = db
-	}
-	deviceWorker := device.NewWorker(sm.DeviceWorkerStore, sm.PubClient, logger)
+	deviceWorker := device.NewWorker(sm.Datastore.DeviceWorkerStore, sm.PubClient, logger)
 	go deviceWorker.Run(context.Background())
 
 	// User
-	if sm.Datastore == server.MySQL {
-		// TODO: implement MySQL UserStore and UserWorkerStore
-		mainLogger.Log("warning", "TODO: implement MySQL UserStore and UserWorkerStore")
-	} else {
-		db, err := userbuiltin.NewDB(sm.BoltDB)
-		if err != nil {
-			stdlog.Fatal(err)
-		}
-		sm.UserStore = db
-		sm.UserWorkerStore = db
-	}
-	if sm.UserStore != nil {
-		userWorker := user.NewWorker(sm.UserWorkerStore, sm.PubClient, logger)
+	if sm.Datastore.UserStore != nil {
+		userWorker := user.NewWorker(sm.Datastore.UserWorkerStore, sm.PubClient, logger)
 		go userWorker.Run(context.Background())
 	}
 
 	// Blueprint
-	if sm.Datastore == server.MySQL {
-		// TODO: implement MySQL BlueprintStore and BlueprintWorkerStore
-		mainLogger.Log("warning", "TODO: implement MySQL BlueprintStore and BlueprintWorkerStore")
-	} else {
-		db, err := blueprintbuiltin.NewDB(sm.BoltDB, sm.ProfileStore)
-		if err != nil {
-			stdlog.Fatal(err)
-		}
-		sm.BlueprintStore = db
-		sm.BlueprintWorkerStore = db
-	}
-	if sm.BlueprintWorkerStore != nil {
+	if sm.Datastore.BlueprintWorkerStore != nil {
 		blueprintWorker := blueprint.NewWorker(
-			sm.BlueprintWorkerStore,
-			sm.UserStore,
-			sm.ProfileStore,
+			sm.Datastore.BlueprintWorkerStore,
+			sm.Datastore.UserStore,
+			sm.Datastore.ProfileStore,
 			sm.CommandService,
 			sm.PubClient,
 			logger,
@@ -250,7 +209,7 @@ func serve(args []string) error {
 	scepEndpoints.PostEndpoint = scep.EndpointLoggingMiddleware(scepComponentLogger)(scepEndpoints.PostEndpoint)
 	scepHandler := scep.MakeHTTPHandler(scepEndpoints, sm.SCEPService, scepComponentLogger)
 
-	var enrollHandlers = enroll.MakeHTTPHandlers(ctx, enroll.MakeServerEndpoints(sm.EnrollService, sm.SCEPStore), httptransport.ServerErrorLogger(httpLogger))
+	var enrollHandlers = enroll.MakeHTTPHandlers(ctx, enroll.MakeServerEndpoints(sm.EnrollService, sm.Datastore.SCEPStore), httptransport.ServerErrorLogger(httpLogger))
 
 	r, options := httputil2.NewRouter(logger)
 
@@ -272,23 +231,23 @@ func serve(args []string) error {
 	if *flAPIKey != "" {
 		basicAuthEndpointMiddleware := basic.AuthMiddleware("micromdm", *flAPIKey, "micromdm")
 
-		configsvc := config.New(sm.ConfigStore)
+		configsvc := config.New(sm.Datastore.ConfigStore)
 		configEndpoints := config.MakeServerEndpoints(configsvc, basicAuthEndpointMiddleware)
 		config.RegisterHTTPHandlers(r, configEndpoints, options...)
 
 		apnsEndpoints := apns.MakeServerEndpoints(sm.APNSPushService, basicAuthEndpointMiddleware)
 		apns.RegisterHTTPHandlers(r, apnsEndpoints, options...)
 
-		devicesvc := device.New(sm.DeviceStore)
+		devicesvc := device.New(sm.Datastore.DeviceStore)
 		deviceEndpoints := device.MakeServerEndpoints(devicesvc, basicAuthEndpointMiddleware)
 		device.RegisterHTTPHandlers(r, deviceEndpoints, options...)
 
-		profilesvc := profile.New(sm.ProfileStore)
+		profilesvc := profile.New(sm.Datastore.ProfileStore)
 		profileEndpoints := profile.MakeServerEndpoints(profilesvc, basicAuthEndpointMiddleware)
 		profile.RegisterHTTPHandlers(r, profileEndpoints, options...)
 
-		if sm.BlueprintStore != nil {
-			blueprintsvc := blueprint.New(sm.BlueprintStore)
+		if sm.Datastore.BlueprintStore != nil {
+			blueprintsvc := blueprint.New(sm.Datastore.BlueprintStore)
 			blueprintEndpoints := blueprint.MakeServerEndpoints(blueprintsvc, basicAuthEndpointMiddleware)
 			blueprint.RegisterHTTPHandlers(r, blueprintEndpoints, options...)
 		}
@@ -296,8 +255,8 @@ func serve(args []string) error {
 		blockEndpoints := block.MakeServerEndpoints(removeService, basicAuthEndpointMiddleware)
 		block.RegisterHTTPHandlers(r, blockEndpoints, options...)
 
-		if sm.UserStore != nil {
-			usersvc := user.New(sm.UserStore)
+		if sm.Datastore.UserStore != nil {
+			usersvc := user.New(sm.Datastore.UserStore)
 			userEndpoints := user.MakeServerEndpoints(usersvc, basicAuthEndpointMiddleware)
 			user.RegisterHTTPHandlers(r, userEndpoints, options...)
 		}
@@ -314,19 +273,16 @@ func serve(args []string) error {
 		depEndpoints := depapi.MakeServerEndpoints(depsvc, basicAuthEndpointMiddleware)
 		depapi.RegisterHTTPHandlers(r, depEndpoints, options...)
 
-		depSyncEndpoints := sync.MakeServerEndpoints(sync.NewService(depSyncer, sm.DEPSyncStore), basicAuthEndpointMiddleware)
+		depSyncEndpoints := sync.MakeServerEndpoints(sync.NewService(depSyncer, sm.Datastore.DEPSyncStore), basicAuthEndpointMiddleware)
 		sync.RegisterHTTPHandlers(r, depSyncEndpoints, options...)
 
-		if sm.Datastore == server.MySQL {
-			// TODO: implement MySQL UserStore and UserWorkerStore
-			mainLogger.Log("warning", "TODO: implement MySQL SCEPChallengeStore)")
-		} else if sm.SCEPChallengeStore != nil {
-			challengeEndpoints := challenge.MakeServerEndpoints(challenge.NewService(sm.SCEPChallengeStore), basicAuthEndpointMiddleware)
+		if sm.Datastore.SCEPChallengeStore != nil {
+			challengeEndpoints := challenge.MakeServerEndpoints(challenge.NewService(sm.Datastore.SCEPChallengeStore), basicAuthEndpointMiddleware)
 			challenge.RegisterHTTPHandlers(r, challengeEndpoints, options...)
 		}
 
-		if sm.Datastore == server.BoltDB && sm.BoltDB != nil {
-			r.HandleFunc("/boltbackup", httputil2.RequireBasicAuth(boltBackup(sm.BoltDB), "micromdm", *flAPIKey, "micromdm"))
+		if sm.Datastore.ID == schema.Bolt && sm.Datastore.BoltDB != nil {
+			r.HandleFunc("/boltbackup", httputil2.RequireBasicAuth(boltBackup(sm.Datastore.BoltDB), "micromdm", *flAPIKey, "micromdm"))
 		}
 	} else {
 		mainLogger.Log("msg", "no api key specified")
