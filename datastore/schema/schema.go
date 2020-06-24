@@ -19,7 +19,7 @@ type ImplementationID int
 
 const (
 	Bolt ImplementationID = iota
-	MySQL
+	Mysql
 )
 
 type Schema struct {
@@ -39,6 +39,7 @@ type Schema struct {
 	RemoveStore          block.Store
 	SCEPChallengeStore   challenge.Store
 	SCEPStore            scepstore.Store
+	UDIDCertAuthStore    device.UDIDCertAuthStore
 	UserStore            user.Store
 	UserWorkerStore      user.WorkerStore
 }

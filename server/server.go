@@ -20,8 +20,6 @@ import (
 	"github.com/micromdm/micromdm/platform/config"
 	"github.com/micromdm/micromdm/platform/dep/sync"
 	"github.com/micromdm/micromdm/platform/device"
-	devicebuiltin "github.com/micromdm/micromdm/platform/device/builtin"
-	devicemysql "github.com/micromdm/micromdm/platform/device/mysql"
 	"github.com/micromdm/micromdm/platform/pubsub"
 	"github.com/micromdm/micromdm/platform/pubsub/inmem"
 
@@ -118,7 +116,7 @@ func (c *Server) Setup(logger log.Logger) error {
 func (c *Server) getDatastoreID() schema.ImplementationID {
 	// If Mysql is set up, use Mysql, else use Bolt as Fallback
 	if c.MysqlUsername != "" && c.MysqlPassword != "" && c.MysqlHost != "" && c.MysqlPort != "" && c.MysqlDatabase != "" {
-		return schema.MySQL
+		return schema.Mysql
 	}
 	return schema.Bolt
 }
@@ -150,10 +148,9 @@ func (c *Server) setupCommandService() error {
 
 func (c *Server) setupCommandQueue(logger log.Logger) error {
 	var q queue.Store
-	var udidCertAuthStore device.UDIDCertAuthStore
 	var err error
 
-	if c.Datastore.ID == schema.MySQL {
+	if c.Datastore.ID == schema.Mysql {
 		opts := []queueMysql.Option{queueMysql.WithLogger(logger)}
 		if c.NoCmdHistory {
 			opts = append(opts, queueMysql.WithoutHistory())
@@ -162,11 +159,6 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 		q, err = queueMysql.NewQueue(c.Datastore.MysqlDB, c.PubClient, opts...)
 		if err != nil {
 			return err
-		}
-
-		udidCertAuthStore, err = devicemysql.NewDB(c.Datastore.MysqlDB)
-		if err != nil {
-			return errors.Wrap(err, "new device db")
 		}
 	} else {
 		opts := []queueBuiltin.Option{queueBuiltin.WithLogger(logger)}
@@ -178,11 +170,6 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 		if err != nil {
 			return err
 		}
-
-		udidCertAuthStore, err = devicebuiltin.NewDB(c.Datastore.BoltDB)
-		if err != nil {
-			return errors.Wrap(err, "new device db")
-		}
 	}
 
 	var mdmService mdm.Service
@@ -192,7 +179,7 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 		mdmService = block.RemoveMiddleware(c.Datastore.RemoveStore)(mdmService)
 
 		udidauthLogger := log.With(logger, "component", "udidcertauth")
-		mdmService = device.UDIDCertAuthMiddleware(udidCertAuthStore, udidauthLogger)(mdmService)
+		mdmService = device.UDIDCertAuthMiddleware(c.Datastore.UDIDCertAuthStore, udidauthLogger)(mdmService)
 	
 		verifycertLogger := log.With(logger, "component", "verifycert")
 		mdmService = VerifyCertificateMiddleware(c.Datastore.SCEPStore, verifycertLogger)(mdmService)

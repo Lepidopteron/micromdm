@@ -19,7 +19,7 @@ import (
 
 func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*schema.Schema, error) {
 	datastore := schema.Schema{
-		ID: schema.MySQL,
+		ID: schema.Mysql,
 	}
 
 	// Database
@@ -36,6 +36,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	}
 	datastore.DeviceStore = deviceDB
 	datastore.DeviceWorkerStore = deviceDB
+	datastore.UDIDCertAuthStore = deviceDB
 
 	// User
 	//userDB, err := devicemysql.NewDB(db)

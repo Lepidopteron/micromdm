@@ -39,6 +39,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	}
 	datastore.DeviceStore = deviceDB
 	datastore.DeviceWorkerStore = deviceDB
+	datastore.UDIDCertAuthStore = deviceDB
 
 	// User
 	userDB, err := userbuiltin.NewDB(db)

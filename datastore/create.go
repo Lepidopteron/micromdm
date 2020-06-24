@@ -9,7 +9,7 @@ import (
 )
 
 func Create(id schema.ImplementationID, configMap map[string]string, pubClient pubsub.PublishSubscriber) (*schema.Schema, error) {
-	if id == schema.MySQL {
+	if id == schema.Mysql {
 		return mysql.Create(configMap, pubClient)
 	} else if id == schema.Bolt {
 		return bolt.Create(configMap, pubClient)
