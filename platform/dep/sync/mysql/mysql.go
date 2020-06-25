@@ -86,7 +86,7 @@ func (d *Mysql) SaveCursor(ctx context.Context, cursor sync.Cursor) error {
 		cursor.CreatedAt = time.Unix(min_timestamp_sec, 0)
 	}
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(tableName).
 		Prefix("ON DUPLICATE KEY").
@@ -112,7 +112,7 @@ func (d *Mysql) SaveCursor(ctx context.Context, cursor sync.Cursor) error {
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building cursor save query")
@@ -128,7 +128,7 @@ func (d *Mysql) SaveAutoAssigner(ctx context.Context, a *sync.AutoAssigner) erro
 	if a.Filter != "*" {
 		return errors.New("only '*' filter auto-assigners supported")
 	}
-updateQuery, args_update, err := sq.StatementBuilder.
+updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("dep_auto_assign").
 		Prefix("ON DUPLICATE KEY").
@@ -154,7 +154,7 @@ updateQuery, args_update, err := sq.StatementBuilder.
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building cursor save query")

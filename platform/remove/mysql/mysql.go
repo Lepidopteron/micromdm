@@ -56,7 +56,7 @@ func (d *Mysql) DeviceByUDID(ctx context.Context, udid string) (*remove.Device, 
 }
 
 func (d *Mysql) Save(ctx context.Context, dev *remove.Device) error {
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(tableName).
 		Prefix("ON DUPLICATE KEY").
@@ -80,7 +80,7 @@ func (d *Mysql) Save(ctx context.Context, dev *remove.Device) error {
 		return errors.Wrap(err, "building push_info save query")
 	}
 
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	return errors.Wrap(err, "exec remove_device save in mysql")
 }

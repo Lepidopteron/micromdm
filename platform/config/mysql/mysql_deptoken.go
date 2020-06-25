@@ -35,7 +35,7 @@ func dep_columns() []string {
 
 func (d *Mysql) AddToken(ctx context.Context, consumerKey string, json []byte) error {
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("server_config").
 		Prefix("ON DUPLICATE KEY").
@@ -62,7 +62,7 @@ func (d *Mysql) AddToken(ctx context.Context, consumerKey string, json []byte) e
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building dep_tokens save query")
@@ -145,7 +145,7 @@ func generateAndStoreDEPKeypair(ctx context.Context, d *Mysql) (key *rsa.Private
 
 	pkBytes := x509.MarshalPKCS1PrivateKey(key)
 	certBytes := cert.Raw
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("server_config").
 		Prefix("ON DUPLICATE KEY").
@@ -171,7 +171,7 @@ func generateAndStoreDEPKeypair(ctx context.Context, d *Mysql) (key *rsa.Private
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	if err != nil {
 		return key, cert, errors.Wrap(err, "building dep_tokens save query")
 	}

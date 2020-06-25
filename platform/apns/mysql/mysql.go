@@ -48,7 +48,7 @@ const tableName = "push_info"
 
 func (d *Mysql) Save(ctx context.Context, i *apns.PushInfo) error {
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(tableName).
 		Prefix("ON DUPLICATE KEY").
@@ -78,7 +78,7 @@ func (d *Mysql) Save(ctx context.Context, i *apns.PushInfo) error {
 		return errors.Wrap(err, "building push_info save query")
 	}
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	return errors.Wrap(err, "exec push_info save in pg")
 }

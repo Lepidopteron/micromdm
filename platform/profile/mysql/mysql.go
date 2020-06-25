@@ -77,7 +77,7 @@ func (d *Mysql) Save(ctx context.Context, p *profile.Profile) error {
 		
 	} else {
 		// Update existing entry
-		updateQuery, args_update, err := sq.StatementBuilder.
+		updateQuery, argsUpdate, err := sq.StatementBuilder.
 			PlaceholderFormat(sq.Question).
 			Update(tableName).
 			Set("mobileconfig", p.Mobileconfig).
@@ -87,7 +87,7 @@ func (d *Mysql) Save(ctx context.Context, p *profile.Profile) error {
 			return errors.Wrap(err, "building update query for device save")
 		}
 		
-		_, err = d.db.ExecContext(ctx, updateQuery, args_update...)
+		_, err = d.db.ExecContext(ctx, updateQuery, argsUpdate...)
 	}
 	
 	return errors.Wrap(err, "exec profile save in mysql")

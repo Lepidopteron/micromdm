@@ -19,7 +19,7 @@ type Mysql struct{ db *sqlx.DB }
 func NewDB(db *sqlx.DB) (*Mysql, error) {
 	// Required for TIMESTAMP DEFAULT 0
 	_,err := db.Exec(`SET sql_mode = '';`)
-	
+
 	_,err = db.Exec(`CREATE TABLE IF NOT EXISTS `+tableName+` (
 		    uuid VARCHAR(40) PRIMARY KEY,
 		    udid VARCHAR(40) DEFAULT '',
@@ -102,29 +102,29 @@ func (d *Mysql) Save(ctx context.Context, device *device.Device) error {
 	t := time.Now()
 	_, offset := t.Zone()
 	// Don't multiply by zero
-	if (offset <= 0) {
+	if offset <= 0 {
 		offset = 1
 	}
-	var min_timestamp_sec int64 = int64(offset) * 60 * 60 * 24
+	var minTimestampSec int64 = int64(offset) * 60 * 60 * 24
 	
-	if (device.DEPProfileAssignTime.IsZero() || device.DEPProfileAssignTime.Unix() < min_timestamp_sec) {
-		device.DEPProfileAssignTime = time.Unix(min_timestamp_sec, 0)
+	if device.DEPProfileAssignTime.IsZero() || device.DEPProfileAssignTime.Unix() < minTimestampSec {
+		device.DEPProfileAssignTime = time.Unix(minTimestampSec, 0)
 	}
 	
-	if (device.DEPProfilePushTime.IsZero() || device.DEPProfilePushTime.Unix() < min_timestamp_sec) {
-		device.DEPProfilePushTime = time.Unix(min_timestamp_sec, 0)
+	if device.DEPProfilePushTime.IsZero() || device.DEPProfilePushTime.Unix() < minTimestampSec {
+		device.DEPProfilePushTime = time.Unix(minTimestampSec, 0)
 	}
 	
-	if (device.DEPProfileAssignedDate.IsZero() || device.DEPProfileAssignedDate.Unix() < min_timestamp_sec) {
-		device.DEPProfileAssignedDate = time.Unix(min_timestamp_sec, 0)
+	if device.DEPProfileAssignedDate.IsZero() || device.DEPProfileAssignedDate.Unix() < minTimestampSec {
+		device.DEPProfileAssignedDate = time.Unix(minTimestampSec, 0)
 	}
 	
-	if (device.LastSeen.IsZero() || device.LastSeen.Unix() < min_timestamp_sec) {
-		device.LastSeen = time.Unix(min_timestamp_sec, 0)
+	if device.LastSeen.IsZero() || device.LastSeen.Unix() < minTimestampSec {
+		device.LastSeen = time.Unix(minTimestampSec, 0)
 	}
 
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(tableName).
 		Prefix("ON DUPLICATE KEY").
@@ -198,7 +198,7 @@ func (d *Mysql) Save(ctx context.Context, device *device.Device) error {
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building device save query")
@@ -247,7 +247,6 @@ func (d *Mysql) DeviceBySerial(ctx context.Context, serial string) (*device.Devi
 		return nil, deviceNotFoundErr{}
 	}
 	return &dev, errors.Wrap(err, "finding device by serial")
-	
 }
 
 func (d *Mysql) List(ctx context.Context, opt device.ListDevicesOption) ([]device.Device, error) {
@@ -296,7 +295,7 @@ func (d *Mysql) DeleteBySerial(ctx context.Context, serial string) error {
 }
 
 func (d *Mysql) SaveUDIDCertHash(ctx context.Context, udid, certHash []byte) error {
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("uuid_cert_auth").
 		Prefix("ON DUPLICATE KEY").
@@ -322,7 +321,7 @@ func (d *Mysql) SaveUDIDCertHash(ctx context.Context, udid, certHash []byte) err
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building udid cert auth save query")

@@ -234,7 +234,7 @@ func generateAndStoreKey(ctx context.Context, d *Depot, bits int) (key *rsa.Priv
 		return nil, err
 	}
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("server_config").
 		Prefix("ON DUPLICATE KEY").
@@ -259,7 +259,7 @@ func generateAndStoreKey(ctx context.Context, d *Depot, bits int) (key *rsa.Priv
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return nil, errors.Wrap(err, "building server_config save query")
@@ -343,7 +343,7 @@ func generateAndStoreCA(ctx context.Context, d *Depot, key *rsa.PrivateKey, year
 	}
 
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update("server_config").
 		Prefix("ON DUPLICATE KEY").
@@ -368,7 +368,7 @@ func generateAndStoreCA(ctx context.Context, d *Depot, key *rsa.PrivateKey, year
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	if err != nil {
 		return nil, errors.Wrap(err, "building server_config save query")
 	}

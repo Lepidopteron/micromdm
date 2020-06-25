@@ -61,7 +61,7 @@ func columns() []string {
 const tableName = "server_config"
 
 func (d *Mysql) SavePushCertificate(ctx context.Context, cert []byte, key []byte) error {
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(tableName).
 		Prefix("ON DUPLICATE KEY").
@@ -88,7 +88,7 @@ func (d *Mysql) SavePushCertificate(ctx context.Context, cert []byte, key []byte
 		Suffix(updateQuery).
 		ToSql()
 	
-	var allArgs = append(args, args_update...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building server_config save query")

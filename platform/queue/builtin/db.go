@@ -307,5 +307,6 @@ func isNotFound(err error) bool {
 }
 
 func (db *DB) UpdateCommandStatus(ctx context.Context, resp mdm.Response) error {
+	// This method is implemented to fulfill the Store interface. It is not used by this datastore.
 	return nil
 }
