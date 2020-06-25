@@ -93,10 +93,16 @@ func (dbWrapper *DBWrapper) Next(ctx context.Context, resp mdm.Response) ([]byte
 }
 
 func (dbWrapper *DBWrapper) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Command, error) {
+	// The UDID is the primary key for the queue.
+	// Depending on the enrollment type, replace the UDID with a different ID type.
+	// UserID for managed user channel
+	// EnrollmentID for BYOD User Enrollment.
 	udid := resp.UDID
 	if resp.UserID != nil {
-		// use the user id for user level commands
 		udid = *resp.UserID
+	}
+	if resp.EnrollmentID != nil {
+		udid = *resp.EnrollmentID
 	}
 
 	err := dbWrapper.Store.UpdateCommandStatus(ctx, resp)
