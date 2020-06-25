@@ -198,13 +198,13 @@ func (d *Mysql) Save(ctx context.Context, device *device.Device) error {
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building device save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec device save in mysql")
 }
@@ -322,13 +322,13 @@ func (d *Mysql) SaveUDIDCertHash(ctx context.Context, udid, certHash []byte) err
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building udid cert auth save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec udid cert auth save in mysql")
 }

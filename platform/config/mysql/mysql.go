@@ -88,13 +88,13 @@ func (d *Mysql) SavePushCertificate(ctx context.Context, cert []byte, key []byte
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building server_config save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec server_config save in mysql")
 }

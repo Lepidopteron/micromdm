@@ -259,13 +259,13 @@ func generateAndStoreKey(ctx context.Context, d *Depot, bits int) (key *rsa.Priv
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return nil, errors.Wrap(err, "building server_config save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return key, errors.Wrap(err, "exec server_config save in mysql")
 }
@@ -368,12 +368,12 @@ func generateAndStoreCA(ctx context.Context, d *Depot, key *rsa.PrivateKey, year
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	if err != nil {
 		return nil, errors.Wrap(err, "building server_config save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return x509.ParseCertificate(crtBytes)
 }

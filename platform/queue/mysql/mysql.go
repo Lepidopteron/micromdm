@@ -319,13 +319,13 @@ func (db *DB) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID str
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, argsUpdate...)
+	var allArgs = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building command save query")
 	}
 	
-	_, err = db.DB.ExecContext(ctx, query, all_args...)
+	_, err = db.DB.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec command save in mysql")
 }

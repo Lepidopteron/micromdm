@@ -62,13 +62,13 @@ func (d *Mysql) AddToken(ctx context.Context, consumerKey string, json []byte) e
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building dep_tokens save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec dep_tokens save in mysql")
 }
@@ -171,11 +171,11 @@ func generateAndStoreDEPKeypair(ctx context.Context, d *Mysql) (key *rsa.Private
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	if err != nil {
 		return key, cert, errors.Wrap(err, "building dep_tokens save query")
 	}
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return key, cert, errors.Wrap(err, "building dep_tokens save query")
 }

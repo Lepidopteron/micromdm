@@ -80,8 +80,8 @@ func (d *Mysql) Save(ctx context.Context, dev *remove.Device) error {
 		return errors.Wrap(err, "building push_info save query")
 	}
 
-	var all_args = append(args, args_update...)
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	var allArgs = append(args, args_update...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	return errors.Wrap(err, "exec remove_device save in mysql")
 }
 

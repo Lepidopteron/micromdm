@@ -112,13 +112,13 @@ func (d *Mysql) SaveCursor(ctx context.Context, cursor sync.Cursor) error {
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building cursor save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec cursor save in mysql")
 }
@@ -154,13 +154,13 @@ updateQuery, args_update, err := sq.StatementBuilder.
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var allArgs = append(args, args_update...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building cursor save query")
 	}
 	
-	_, err = d.db.ExecContext(ctx, query, all_args...)
+	_, err = d.db.ExecContext(ctx, query, allArgs...)
 	
 	return errors.Wrap(err, "exec cursor save in mysql")
 }
