@@ -11,11 +11,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/auth/basic"
 	"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
@@ -281,8 +279,8 @@ func serve(args []string) error {
 			challenge.RegisterHTTPHandlers(r, challengeEndpoints, options...)
 		}
 
-		if sm.Datastore.ID == schema.Bolt && sm.Datastore.BoltDB != nil {
-			r.HandleFunc("/boltbackup", httputil2.RequireBasicAuth(boltBackup(sm.Datastore.BoltDB), "micromdm", *flAPIKey, "micromdm"))
+		if sm.Datastore.ID == schema.Bolt && sm.Datastore.BackupSource != nil {
+			r.HandleFunc("/boltbackup", httputil2.RequireBasicAuth(sm.Datastore.BackupSource.ReturnBackup(), "micromdm", *flAPIKey, "micromdm"))
 		}
 	} else {
 		mainLogger.Log("msg", "no api key specified")
@@ -354,21 +352,6 @@ func serveOptions(
 		serveOpts = append(serveOpts, httputil.WithAddress(addr))
 	}
 	return serveOpts
-}
-
-func boltBackup(db *bolt.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := db.View(func(tx *bolt.Tx) error {
-			w.Header().Set("Content-Type", "application/octet-stream")
-			w.Header().Set("Content-Disposition", `attachment; filename="micromdm.db"`)
-			w.Header().Set("Content-Length", strconv.Itoa(int(tx.Size())))
-			_, err := tx.WriteTo(w)
-			return err
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
 }
 
 func printExamples() {

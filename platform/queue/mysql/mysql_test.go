@@ -164,7 +164,7 @@ func Test_SaveCommand(t *testing.T) {
 }
 
 
-func setupDB(t *testing.T) *Store {
+func setupDB(t *testing.T) *DBWrapper {
 	// https://stackoverflow.com/a/23550874/464016
 	db, err := dbutil.OpenDBX(
 		"mysql",
@@ -178,7 +178,7 @@ func setupDB(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 
-	store := &Store{db: db, logger: log.NewNopLogger()}
+	store := &DBWrapper{db: db, logger: log.NewNopLogger()}
 	_,err = db.Exec(`TRUNCATE TABLE device_commands;`)
 	//store.NewQueue(db, nil)
 	return store

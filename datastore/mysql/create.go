@@ -12,6 +12,7 @@ import (
 	devicemysql "github.com/micromdm/micromdm/platform/device/mysql"
 	profilemysql "github.com/micromdm/micromdm/platform/profile/mysql"
 	"github.com/micromdm/micromdm/platform/pubsub"
+	queueMysql "github.com/micromdm/micromdm/platform/queue/mysql"
 	blockmysql "github.com/micromdm/micromdm/platform/remove/mysql"
 	scepmysql "github.com/micromdm/micromdm/platform/scep/mysql"
 	"github.com/pkg/errors"
@@ -27,7 +28,6 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	if err != nil {
 		return nil, err
 	}
-	datastore.MysqlDB = db
 
 	// Device
 	deviceDB, err := devicemysql.NewDB(db)
@@ -106,11 +106,17 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 
 	// SCEP
 	scepDB, err := scepmysql.NewDB(db)
-	datastore.RemoveStore = removeDB
 	if err != nil {
 		return nil, err
 	}
 	datastore.SCEPStore = scepDB
+
+	// Queue
+	queueDB, err :=  queueMysql.NewDB(db)
+	if err != nil {
+		return nil, err
+	}
+	datastore.QueueStore = queueDB
 
 	return &datastore, nil
 }

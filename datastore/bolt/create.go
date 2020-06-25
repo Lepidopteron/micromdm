@@ -10,6 +10,7 @@ import (
 	devicebuiltin "github.com/micromdm/micromdm/platform/device/builtin"
 	profilebuiltin "github.com/micromdm/micromdm/platform/profile/builtin"
 	"github.com/micromdm/micromdm/platform/pubsub"
+	queueBuiltin "github.com/micromdm/micromdm/platform/queue/builtin"
 	blockbuiltin "github.com/micromdm/micromdm/platform/remove/builtin"
 	scepbuiltin "github.com/micromdm/micromdm/platform/scep/builtin"
 	userbuiltin "github.com/micromdm/micromdm/platform/user/builtin"
@@ -30,7 +31,6 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	if err != nil {
 		return nil, err
 	}
-	datastore.BoltDB = db
 
 	// Device
 	deviceDB, err := devicebuiltin.NewDB(db)
@@ -103,11 +103,20 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 
 	// SCEP
 	scepDB, err := scepbuiltin.NewDB(db)
-	datastore.RemoveStore = removeDB
 	if err != nil {
 		return nil, err
 	}
 	datastore.SCEPStore = scepDB
+
+	// Queue
+	queueDB, err := queueBuiltin.NewDB(db)
+	if err != nil {
+		return nil, err
+	}
+	datastore.QueueStore = queueDB
+
+	// Backup
+	datastore.BackupSource = &DB{DB: db}
 
 	return &datastore, nil
 }

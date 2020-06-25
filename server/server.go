@@ -147,7 +147,7 @@ func (c *Server) setupCommandService() error {
 }
 
 func (c *Server) setupCommandQueue(logger log.Logger) error {
-	var q queue.Store
+	var q queue.Queue
 	var err error
 
 	if c.Datastore.ID == schema.Mysql {
@@ -156,7 +156,7 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 			opts = append(opts, queueMysql.WithoutHistory())
 		}
 
-		q, err = queueMysql.NewQueue(c.Datastore.MysqlDB, c.PubClient, opts...)
+		q, err = queueMysql.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
 		if err != nil {
 			return err
 		}
@@ -165,8 +165,8 @@ func (c *Server) setupCommandQueue(logger log.Logger) error {
 		if c.NoCmdHistory {
 			opts = append(opts, queueBuiltin.WithoutHistory())
 		}
-		
-		q, err = queueBuiltin.NewQueue(c.Datastore.BoltDB, c.PubClient, opts...)
+
+		q, err = queueBuiltin.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
 		if err != nil {
 			return err
 		}

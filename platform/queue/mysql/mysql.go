@@ -3,37 +3,37 @@ package mysql
 
 import (
 	"context"
-	"fmt"
-	"strings"
-	"time"
 	"database/sql"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	sq "gopkg.in/Masterminds/squirrel.v1"
-	
+	"strings"
+	"time"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/groob/plist"
 	"github.com/pkg/errors"
-	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/micromdm/micromdm/mdm"
 	"github.com/micromdm/micromdm/platform/command"
-	"github.com/micromdm/micromdm/platform/queue"
 	"github.com/micromdm/micromdm/platform/pubsub"
+	"github.com/micromdm/micromdm/platform/queue"
 )
 
 const (
-	DeviceCommandBucket = "mdm.DeviceCommands"
-	CommandQueuedTopic = "mdm.CommandQueued"
-	
 	DeviceCommandTable = "device_commands"
-	CommandQueueTable = "command_queue"
 )
 
-type Store struct {
-	db *sqlx.DB
-	logger log.Logger
+type DBWrapper struct {
+	Store          queue.Store
+	logger         log.Logger
 	withoutHistory bool
+}
+
+type DB struct {
+	*sqlx.DB
 }
 
 type MysqlCommand struct {
@@ -67,22 +67,22 @@ func command_columns() []string {
 	}
 }
 
-type Option func(*Store)
+type Option func(*DBWrapper)
 
 func WithLogger(logger log.Logger) Option {
-	return func(s *Store) {
+	return func(s *DBWrapper) {
 		s.logger = logger
 	}
 }
 
 func WithoutHistory() Option {
-	return func(s *Store) {
+	return func(s *DBWrapper) {
 		s.withoutHistory = true
 	}
 }
 
-func (db *Store) Next(ctx context.Context, resp mdm.Response) ([]byte, error) {
-	cmd, err := db.nextCommand(ctx, resp)
+func (dbWrapper *DBWrapper) Next(ctx context.Context, resp mdm.Response) ([]byte, error) {
+	cmd, err := dbWrapper.nextCommand(ctx, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -92,26 +92,26 @@ func (db *Store) Next(ctx context.Context, resp mdm.Response) ([]byte, error) {
 	return cmd.Payload, nil
 }
 
-func (db *Store) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Command, error) {
+func (dbWrapper *DBWrapper) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Command, error) {
 	udid := resp.UDID
 	if resp.UserID != nil {
 		// use the user id for user level commands
 		udid = *resp.UserID
 	}
-	
-	update_error := db.UpdateCommandStatus(ctx, resp)
-	if update_error != nil {
-		return nil, update_error
+
+	err := dbWrapper.Store.UpdateCommandStatus(ctx, resp)
+	if err != nil {
+		return nil, err
 	}
-	
-	dc, err := db.DeviceCommand(ctx, udid)
+
+	dc, err := dbWrapper.Store.DeviceCommand(ctx, udid)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
 		}
 		return nil, errors.Wrapf(err, "get device command from queue, udid: %s", resp.UDID)
 	}
-	
+
 	var cmd *queue.Command
 	switch resp.Status {
 	case "NotNow":
@@ -131,19 +131,20 @@ func (db *Store) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Com
 		if x == nil {
 			break
 		}
-		if !db.withoutHistory {
+		if !dbWrapper.withoutHistory {
 			x.Acknowledged = time.Now().UTC()
 			dc.Completed = append(dc.Completed, *x)
 		}
+
 	case "Error":
 		// move to failed, send next
 		x, a := cut(dc.Commands, resp.CommandUUID)
-	
+
 		dc.Commands = a
 		if x == nil { // must've already bin ackd
 			break
 		}
-		if !db.withoutHistory {
+		if !dbWrapper.withoutHistory {
 			dc.Failed = append(dc.Failed, *x)
 		}
 
@@ -154,7 +155,7 @@ func (db *Store) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Com
 		if x == nil {
 			break
 		}
-		if !db.withoutHistory {
+		if !dbWrapper.withoutHistory {
 			dc.Failed = append(dc.Failed, *x)
 		}
 
@@ -164,8 +165,8 @@ func (db *Store) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Com
 	default:
 		return nil, fmt.Errorf("unknown response status: %s", resp.Status)
 	}
-	
-	
+
+
 	// pop the first command from the queue and add it to the end.
 	// If the regular queue is empty, send a command that got
 	// refused with NotNow before.
@@ -179,7 +180,7 @@ func (db *Store) nextCommand(ctx context.Context, resp mdm.Response) (*queue.Com
 		}
 	}
 
-	if err := db.Save(ctx, dc); err != nil {
+	if err := dbWrapper.Store.Save(ctx, dc); err != nil {
 		return nil, err
 	}
 	return cmd, nil
@@ -234,46 +235,49 @@ func SetupDB(db *sqlx.DB) error {
 	return nil
 }
 
-func NewQueue(db *sqlx.DB, pubsub pubsub.PublishSubscriber, opts ...Option) (*Store, error) {
+func NewDB(db *sqlx.DB) (*DB, error) {
 	SetupDB(db)
-	
-	datastore := &Store{db: db, logger: log.NewNopLogger()}
+
+	return &DB{DB: db}, nil
+}
+
+func NewQueue(store *queue.Store, pubsub pubsub.PublishSubscriber, opts ...Option) (*DBWrapper, error) {
+	dbWrapper := &DBWrapper{Store: *store, logger: log.NewNopLogger()}
 	for _, fn := range opts {
-		fn(datastore)
+		fn(dbWrapper)
 	}
 
-	ctx := context.Background()
-	if err := datastore.pollCommands(ctx, pubsub); err != nil {
+	if err := dbWrapper.pollCommands(context.Background(), pubsub); err != nil {
 		return nil, err
 	}
 
-	return datastore, nil
+	return dbWrapper, nil
 }
 
-func (db *Store) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID string, order int) error {
+func (db *DB) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID string, order int) error {
 	// Make sure we take the time offset into account for "zero" dates	
 	t := time.Now()
 	_, offset := t.Zone()
 
 	// Don't multiply by zero
-	if (offset <= 0) {
+	if offset <= 0 {
 		offset = 1
 	}
-	var min_timestamp_sec int64 = int64(offset) * 60 * 60 * 24
+	var minTimestampSec int64 = int64(offset) * 60 * 60 * 24
 	
-	if (cmd.CreatedAt.IsZero() || cmd.CreatedAt.Unix() < min_timestamp_sec) {
-		cmd.CreatedAt = time.Unix(min_timestamp_sec, 0)
+	if cmd.CreatedAt.IsZero() || cmd.CreatedAt.Unix() < minTimestampSec {
+		cmd.CreatedAt = time.Unix(minTimestampSec, 0)
 	}
 	
-	if (cmd.LastSentAt.IsZero() || cmd.LastSentAt.Unix() < min_timestamp_sec) {
-		cmd.LastSentAt = time.Unix(min_timestamp_sec, 0)
+	if cmd.LastSentAt.IsZero() || cmd.LastSentAt.Unix() < minTimestampSec {
+		cmd.LastSentAt = time.Unix(minTimestampSec, 0)
 	}
 	
-	if (cmd.Acknowledged.IsZero() || cmd.Acknowledged.Unix() < min_timestamp_sec) {
-		cmd.Acknowledged = time.Unix(min_timestamp_sec, 0)
+	if cmd.Acknowledged.IsZero() || cmd.Acknowledged.Unix() < minTimestampSec {
+		cmd.Acknowledged = time.Unix(minTimestampSec, 0)
 	}
 	
-	updateQuery, args_update, err := sq.StatementBuilder.
+	updateQuery, argsUpdate, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(DeviceCommandTable).
 		Prefix("ON DUPLICATE KEY").
@@ -315,19 +319,19 @@ func (db *Store) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID 
 		Suffix(updateQuery).
 		ToSql()
 	
-	var all_args = append(args, args_update...)
+	var all_args = append(args, argsUpdate...)
 	
 	if err != nil {
 		return errors.Wrap(err, "building command save query")
 	}
 	
-	_, err = db.db.ExecContext(ctx, query, all_args...)
+	_, err = db.DB.ExecContext(ctx, query, all_args...)
 	
 	return errors.Wrap(err, "exec command save in mysql")
 }
 
-func (db *Store) Save(ctx context.Context, cmd *queue.DeviceCommand) error {
-	SetupDB(db.db)
+func (db *DB) Save(ctx context.Context, cmd *queue.DeviceCommand) error {
+	SetupDB(db.DB)
 
 	var err error
 	
@@ -340,7 +344,7 @@ func (db *Store) Save(ctx context.Context, cmd *queue.DeviceCommand) error {
 	return err
 }
 
-func (db *Store) DeviceCommand(ctx context.Context, udid string) (*queue.DeviceCommand, error) {
+func (db *DB) DeviceCommand(ctx context.Context, udid string) (*queue.DeviceCommand, error) {
 	query, args, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Select(command_columns()...).
@@ -353,7 +357,7 @@ func (db *Store) DeviceCommand(ctx context.Context, udid string) (*queue.DeviceC
 	}
 
 	var list []MysqlCommand
-	err = db.db.SelectContext(ctx, &list, query, args...)
+	err = db.DB.SelectContext(ctx, &list, query, args...)
 	if errors.Cause(err) == sql.ErrNoRows {
 		return nil, deviceCommandNotFoundErr{}
 	}
@@ -373,7 +377,7 @@ func (e *notFound) Error() string {
 	return fmt.Sprintf("not found: %s %s", e.ResourceType, e.Message)
 }
 
-func (db *Store) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscriber) error {
+func (dbWrapper *DBWrapper) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscriber) error {
 	commandEvents, err := pubsub.Subscribe(context.TODO(), "command-queue", command.CommandTopic)
 	if err != nil {
 		return errors.Wrapf(err,
@@ -385,19 +389,19 @@ func (db *Store) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscrib
 			case event := <-commandEvents:
 				var ev command.Event
 				if err := command.UnmarshalEvent(event.Message, &ev); err != nil {
-					level.Info(db.logger).Log("msg", "unmarshal command event in queue", "err", err)
+					level.Info(dbWrapper.logger).Log("msg", "unmarshal command event in queue", "err", err)
 					continue
 				}
 
 				cmd := new(queue.DeviceCommand)
 				cmd.DeviceUDID = ev.DeviceUDID
-				byUDID, err := db.DeviceCommand(ctx, ev.DeviceUDID)
+				byUDID, err := dbWrapper.Store.DeviceCommand(ctx, ev.DeviceUDID)
 				if err == nil && byUDID != nil {
 					cmd = byUDID
 				}
 				newPayload, err := plist.Marshal(ev.Payload)
 				if err != nil {
-					level.Info(db.logger).Log("msg", "marshal event payload", "err", err)
+					level.Info(dbWrapper.logger).Log("msg", "marshal event payload", "err", err)
 					continue
 				}
 				newCmd := queue.Command{
@@ -405,11 +409,11 @@ func (db *Store) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscrib
 					Payload: newPayload,
 				}
 				cmd.Commands = append(cmd.Commands, newCmd)
-				if err := db.Save(ctx, cmd); err != nil {
-					level.Info(db.logger).Log("msg", "save command in db", "err", err)
+				if err := dbWrapper.Store.Save(ctx, cmd); err != nil {
+					level.Info(dbWrapper.logger).Log("msg", "save command in db", "err", err)
 					continue
 				}
-				level.Info(db.logger).Log(
+				level.Info(dbWrapper.logger).Log(
 					"msg", "queued event for device",
 					"device_udid", ev.DeviceUDID,
 					"command_uuid", ev.Payload.CommandUUID,
@@ -422,16 +426,17 @@ func (db *Store) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscrib
 
 				msgBytes, err := queue.MarshalQueuedCommand(cq)
 				if err != nil {
-					level.Info(db.logger).Log("msg", "marshal queued command", "err", err)
+					level.Info(dbWrapper.logger).Log("msg", "marshal queued command", "err", err)
 					continue
 				}
 
-				if err := pubsub.Publish(context.TODO(), CommandQueuedTopic, msgBytes); err != nil {
-					level.Info(db.logger).Log("msg", "publish command to queued topic", "err", err)
+				if err := pubsub.Publish(context.TODO(), queue.CommandQueuedTopic, msgBytes); err != nil {
+					level.Info(dbWrapper.logger).Log("msg", "publish command to queued topic", "err", err)
 				}
 			}
 		}
 	}()
+
 	return nil
 }
 
@@ -453,22 +458,14 @@ func (e deviceCommandNotFoundErr) NotFound() bool {
 	return true
 }
 
-
-/*
-func (deviceCommand *queue.DeviceCommand) marshalMysqlCommand() []MysqlCommand {
-	// queue.DeviceCommand --> List of MysqlCommand
-    return nil
-}
-*/
-
-func (db *Store) UpdateCommandStatus(ctx context.Context, resp mdm.Response) error {
+func (db *DB) UpdateCommandStatus(ctx context.Context, resp mdm.Response) error {
 	query, args, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Update(DeviceCommandTable).
 		Set("last_status", resp.Status).
 		Where(sq.Eq{"uuid": resp.CommandUUID}).
 		ToSql()
-	_, err = db.db.ExecContext(ctx, query, args...)
+	_, err = db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return errors.Wrap(err, "building update query for command save")
 	}

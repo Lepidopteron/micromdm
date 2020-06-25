@@ -156,7 +156,7 @@ func TestNext_zeroCommands(t *testing.T) {
 
 }
 
-func setupDB(t *testing.T) (*Store, func()) {
+func setupDB(t *testing.T) (*DBWrapper, func()) {
 	f, _ := ioutil.TempFile("", "bolt-")
 	teardown := func() {
 		f.Close()
@@ -174,6 +174,6 @@ func setupDB(t *testing.T) (*Store, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := &Store{DB: db, logger: log.NewNopLogger()}
+	store := &DBWrapper{DB: db, logger: log.NewNopLogger()}
 	return store, teardown
 }
