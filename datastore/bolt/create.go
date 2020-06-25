@@ -26,7 +26,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 		ID: schema.Bolt,
 	}
 
-	// Database
+	// Bolt Database
 	db, err := createDB(configMap)
 	if err != nil {
 		return nil, err

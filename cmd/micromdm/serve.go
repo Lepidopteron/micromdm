@@ -183,17 +183,15 @@ func serve(args []string) error {
 	}
 
 	// Blueprint
-	if sm.Datastore.BlueprintWorkerStore != nil {
-		blueprintWorker := blueprint.NewWorker(
-			sm.Datastore.BlueprintWorkerStore,
-			sm.Datastore.UserStore,
-			sm.Datastore.ProfileStore,
-			sm.CommandService,
-			sm.PubClient,
-			logger,
-		)
-		go blueprintWorker.Run(context.Background())
-	}
+	blueprintWorker := blueprint.NewWorker(
+		sm.Datastore.BlueprintWorkerStore,
+		sm.Datastore.UserStore,
+		sm.Datastore.ProfileStore,
+		sm.CommandService,
+		sm.PubClient,
+		logger,
+	)
+	go blueprintWorker.Run(context.Background())
 
 	ctx := context.Background()
 	httpLogger := log.With(logger, "transport", "http")
@@ -244,20 +242,16 @@ func serve(args []string) error {
 		profileEndpoints := profile.MakeServerEndpoints(profilesvc, basicAuthEndpointMiddleware)
 		profile.RegisterHTTPHandlers(r, profileEndpoints, options...)
 
-		if sm.Datastore.BlueprintStore != nil {
-			blueprintsvc := blueprint.New(sm.Datastore.BlueprintStore)
-			blueprintEndpoints := blueprint.MakeServerEndpoints(blueprintsvc, basicAuthEndpointMiddleware)
-			blueprint.RegisterHTTPHandlers(r, blueprintEndpoints, options...)
-		}
+		blueprintsvc := blueprint.New(sm.Datastore.BlueprintStore)
+		blueprintEndpoints := blueprint.MakeServerEndpoints(blueprintsvc, basicAuthEndpointMiddleware)
+		blueprint.RegisterHTTPHandlers(r, blueprintEndpoints, options...)
 
 		blockEndpoints := block.MakeServerEndpoints(removeService, basicAuthEndpointMiddleware)
 		block.RegisterHTTPHandlers(r, blockEndpoints, options...)
 
-		if sm.Datastore.UserStore != nil {
-			usersvc := user.New(sm.Datastore.UserStore)
-			userEndpoints := user.MakeServerEndpoints(usersvc, basicAuthEndpointMiddleware)
-			user.RegisterHTTPHandlers(r, userEndpoints, options...)
-		}
+		usersvc := user.New(sm.Datastore.UserStore)
+		userEndpoints := user.MakeServerEndpoints(usersvc, basicAuthEndpointMiddleware)
+		user.RegisterHTTPHandlers(r, userEndpoints, options...)
 
 		appsvc := appstore.New(appDB)
 		appEndpoints := appstore.MakeServerEndpoints(appsvc, basicAuthEndpointMiddleware)
