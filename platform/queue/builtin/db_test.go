@@ -2,18 +2,19 @@ package builtin
 
 import (
 	"context"
+	"github.com/micromdm/micromdm/platform/queue/service"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
-	"github.com/micromdm/micromdm/platform/queue"
 	"github.com/micromdm/micromdm/mdm"
+	"github.com/micromdm/micromdm/platform/queue"
 )
 
 func TestNext_Error(t *testing.T) {
-	store, teardown := setupDB(t)
+	svc, teardown := setupDB(t)
 	defer teardown()
 	ctx := context.Background()
 
@@ -21,7 +22,7 @@ func TestNext_Error(t *testing.T) {
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "zCmd"})
-	if err := store.Save(ctx, dc); err != nil {
+	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -31,7 +32,7 @@ func TestNext_Error(t *testing.T) {
 		Status:      "Error",
 	}
 	for range dc.Commands {
-		cmd, err := store.nextCommand(ctx, resp)
+		cmd, err := svc.NextCommand(ctx, resp)
 		if err != nil {
 			t.Fatalf("expected nil, but got err: %s", err)
 		}
@@ -39,21 +40,21 @@ func TestNext_Error(t *testing.T) {
 			t.Fatal("expected cmd but got nil")
 		}
 
-		if have, errd := cmd.UUID, resp.CommandUUID; have == errd {
+		if have, err := cmd.UUID, resp.CommandUUID; have == err {
 			t.Error("got back command which previously failed")
 		}
 	}
 }
 
 func TestNext_NotNow(t *testing.T) {
-	store, teardown := setupDB(t)
+	svc, teardown := setupDB(t)
 	defer teardown()
 	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
-	if err := store.Save(ctx, dc); err != nil {
+	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,7 +65,7 @@ func TestNext_NotNow(t *testing.T) {
 			CommandUUID: "yCmd",
 			Status:      "NotNow",
 		}
-		cmd, err := store.nextCommand(ctx, resp)
+		cmd, err := svc.NextCommand(ctx, resp)
 
 		if err != nil {
 			t.Fatalf("expected nil, but got err: %s", err)
@@ -76,7 +77,7 @@ func TestNext_NotNow(t *testing.T) {
 			Status:      "NotNow",
 		}
 
-		cmd, err = store.nextCommand(ctx, resp)
+		cmd, err = svc.NextCommand(ctx, resp)
 		if err != nil {
 			t.Fatalf("expected nil, but got err: %s", err)
 		}
@@ -87,14 +88,14 @@ func TestNext_NotNow(t *testing.T) {
 
 	t.Run("withManyCommands", tf)
 	dc.Commands = []queue.Command{{UUID: "xCmd"}}
-	if err := store.Save(ctx, dc); err != nil {
+	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 	t.Run("withOneCommand", tf)
 }
 
 func TestNext_Idle(t *testing.T) {
-	store, teardown := setupDB(t)
+	svc, teardown := setupDB(t)
 	defer teardown()
 	ctx := context.Background()
 
@@ -102,7 +103,7 @@ func TestNext_Idle(t *testing.T) {
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "zCmd"})
-	if err := store.Save(ctx, dc); err != nil {
+	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +113,7 @@ func TestNext_Idle(t *testing.T) {
 		Status:      "Idle",
 	}
 	for i := range dc.Commands {
-		cmd, err := store.nextCommand(ctx, resp)
+		cmd, err := svc.NextCommand(ctx, resp)
 		if err != nil {
 			t.Fatalf("expected nil, but got err: %s", err)
 		}
@@ -127,12 +128,12 @@ func TestNext_Idle(t *testing.T) {
 }
 
 func TestNext_zeroCommands(t *testing.T) {
-	store, teardown := setupDB(t)
+	svc, teardown := setupDB(t)
 	defer teardown()
 	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
-	if err := store.Save(ctx, dc); err != nil {
+	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -144,7 +145,7 @@ func TestNext_zeroCommands(t *testing.T) {
 	for _, s := range allStatuses {
 		t.Run(s, func(t *testing.T) {
 			resp := mdm.Response{CommandUUID: s, Status: s}
-			cmd, err := store.nextCommand(ctx, resp)
+			cmd, err := svc.NextCommand(ctx, resp)
 			if err != nil {
 				t.Errorf("expected nil, but got err: %s", err)
 			}
@@ -156,7 +157,7 @@ func TestNext_zeroCommands(t *testing.T) {
 
 }
 
-func setupDB(t *testing.T) (*DBWrapper, func()) {
+func setupDB(t *testing.T) (*service.QueueService, func()) {
 	f, _ := ioutil.TempFile("", "bolt-")
 	teardown := func() {
 		f.Close()
@@ -174,6 +175,7 @@ func setupDB(t *testing.T) (*DBWrapper, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := &DBWrapper{DB: db, logger: log.NewNopLogger()}
-	return store, teardown
+	store, err := NewDB(db)
+	svc := &service.QueueService{Store: store, Logger: log.NewNopLogger()}
+	return svc, teardown
 }

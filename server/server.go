@@ -7,6 +7,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/micromdm/micromdm/datastore"
 	"github.com/micromdm/micromdm/datastore/schema"
+	"github.com/micromdm/micromdm/platform/queue/service"
 	scep "github.com/micromdm/scep/server"
 	"github.com/pkg/errors"
 	"net/http"
@@ -23,7 +24,6 @@ import (
 	"github.com/micromdm/micromdm/platform/pubsub"
 	"github.com/micromdm/micromdm/platform/pubsub/inmem"
 
-	"github.com/micromdm/micromdm/platform/queue"
 	block "github.com/micromdm/micromdm/platform/remove"
 	"github.com/micromdm/micromdm/workflow/webhook"
 )
@@ -144,12 +144,12 @@ func (c *Server) setupCommandService() error {
 }
 
 func (c *Server) setupCommandQueue(logger log.Logger) error {
-	opts := []queue.Option{queue.WithLogger(logger)}
+	opts := []service.Option{service.WithLogger(logger)}
 	if c.NoCmdHistory {
-		opts = append(opts, queue.WithoutHistory())
+		opts = append(opts, service.WithoutHistory())
 	}
 
-	q, err := queue.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
+	q, err := service.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
 	if err != nil {
 		return err
 	}

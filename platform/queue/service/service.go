@@ -1,5 +1,4 @@
-// Package queue implements a boldDB backed queue for MDM Commands.
-package queue
+package service
 
 import (
 	"context"
@@ -10,13 +9,9 @@ import (
 	"github.com/micromdm/micromdm/mdm"
 	"github.com/micromdm/micromdm/platform/command"
 	"github.com/micromdm/micromdm/platform/pubsub"
+	"github.com/micromdm/micromdm/platform/queue"
 	"github.com/pkg/errors"
 	"time"
-)
-
-const (
-	DeviceCommandBucket = "mdm.DeviceCommands"
-	CommandQueuedTopic = "mdm.CommandQueued"
 )
 
 type Queue interface {
@@ -24,14 +19,14 @@ type Queue interface {
 }
 
 type Store interface {
-	Save(ctx context.Context, cmd *DeviceCommand) error
-	DeviceCommand(ctx context.Context, udid string) (*DeviceCommand, error)
+	Save(ctx context.Context, cmd *queue.DeviceCommand) error
+	DeviceCommand(ctx context.Context, udid string) (*queue.DeviceCommand, error)
 	UpdateCommandStatus(ctx context.Context, resp mdm.Response) error
 }
 
 type QueueService struct {
 	Store          Store
-	logger         log.Logger
+	Logger         log.Logger
 	withoutHistory bool
 }
 
@@ -39,7 +34,7 @@ type Option func(*QueueService)
 
 func WithLogger(logger log.Logger) Option {
 	return func(s *QueueService) {
-		s.logger = logger
+		s.Logger = logger
 	}
 }
 
@@ -50,7 +45,7 @@ func WithoutHistory() Option {
 }
 
 func (svc *QueueService) Next(ctx context.Context, resp mdm.Response) ([]byte, error) {
-	cmd, err := svc.nextCommand(ctx, resp)
+	cmd, err := svc.NextCommand(ctx, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +55,7 @@ func (svc *QueueService) Next(ctx context.Context, resp mdm.Response) ([]byte, e
 	return cmd.Payload, nil
 }
 
-func (svc *QueueService) nextCommand(ctx context.Context, resp mdm.Response) (*Command, error) {
+func (svc *QueueService) NextCommand(ctx context.Context, resp mdm.Response) (*queue.Command, error) {
 	// The UDID is the primary key for the queue.
 	// Depending on the enrollment type, replace the UDID with a different ID type.
 	// UserID for managed user channel
@@ -80,13 +75,13 @@ func (svc *QueueService) nextCommand(ctx context.Context, resp mdm.Response) (*C
 
 	dc, err := svc.Store.DeviceCommand(ctx, udid)
 	if err != nil {
-		if isNotFound(err) {
+		if queue.IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, errors.Wrapf(err, "get device command from queue, udid: %s", resp.UDID)
 	}
 
-	var cmd *Command
+	var cmd *queue.Command
 	switch resp.Status {
 	case "NotNow":
 		// We will try this command later when the device is not
@@ -140,7 +135,6 @@ func (svc *QueueService) nextCommand(ctx context.Context, resp mdm.Response) (*C
 		return nil, fmt.Errorf("unknown response status: %s", resp.Status)
 	}
 
-
 	// pop the first command from the queue and add it to the end.
 	// If the regular queue is empty, send a command that got
 	// refused with NotNow before.
@@ -160,7 +154,7 @@ func (svc *QueueService) nextCommand(ctx context.Context, resp mdm.Response) (*C
 	return cmd, nil
 }
 
-func popFirst(all []Command) (*Command, []Command) {
+func popFirst(all []queue.Command) (*queue.Command, []queue.Command) {
 	if len(all) == 0 {
 		return nil, all
 	}
@@ -169,7 +163,7 @@ func popFirst(all []Command) (*Command, []Command) {
 	return &first, all
 }
 
-func cut(all []Command, uuid string) (*Command, []Command) {
+func cut(all []queue.Command, uuid string) (*queue.Command, []queue.Command) {
 	for i, cmd := range all {
 		if cmd.UUID == uuid {
 			all = append(all[:i], all[i+1:]...)
@@ -180,7 +174,7 @@ func cut(all []Command, uuid string) (*Command, []Command) {
 }
 
 func NewQueue(store *Store, pubsub pubsub.PublishSubscriber, opts ...Option) (*QueueService, error) {
-	svc := &QueueService{Store: *store, logger: log.NewNopLogger()}
+	svc := &QueueService{Store: *store, Logger: log.NewNopLogger()}
 	for _, fn := range opts {
 		fn(svc)
 	}
@@ -192,15 +186,6 @@ func NewQueue(store *Store, pubsub pubsub.PublishSubscriber, opts ...Option) (*Q
 	return svc, nil
 }
 
-type NotFound struct {
-	ResourceType string
-	Message      string
-}
-
-func (e *NotFound) Error() string {
-	return fmt.Sprintf("not found: %s %s", e.ResourceType, e.Message)
-}
- 
 func (svc *QueueService) pollCommands(ctx context.Context, pubsub pubsub.PublishSubscriber) error {
 	commandEvents, err := pubsub.Subscribe(context.TODO(), "command-queue", command.CommandTopic)
 	if err != nil {
@@ -213,11 +198,11 @@ func (svc *QueueService) pollCommands(ctx context.Context, pubsub pubsub.Publish
 			case event := <-commandEvents:
 				var ev command.Event
 				if err := command.UnmarshalEvent(event.Message, &ev); err != nil {
-					level.Info(svc.logger).Log("msg", "unmarshal command event in queue", "err", err)
+					level.Info(svc.Logger).Log("msg", "unmarshal command event in queue", "err", err)
 					continue
 				}
 
-				cmd := new(DeviceCommand)
+				cmd := new(queue.DeviceCommand)
 				cmd.DeviceUDID = ev.DeviceUDID
 				byUDID, err := svc.Store.DeviceCommand(ctx, ev.DeviceUDID)
 				if err == nil && byUDID != nil {
@@ -225,48 +210,41 @@ func (svc *QueueService) pollCommands(ctx context.Context, pubsub pubsub.Publish
 				}
 				newPayload, err := plist.Marshal(ev.Payload)
 				if err != nil {
-					level.Info(svc.logger).Log("msg", "marshal event payload", "err", err)
+					level.Info(svc.Logger).Log("msg", "marshal event payload", "err", err)
 					continue
 				}
-				newCmd := Command{
+				newCmd := queue.Command{
 					UUID:    ev.Payload.CommandUUID,
 					Payload: newPayload,
 				}
 				cmd.Commands = append(cmd.Commands, newCmd)
 				if err := svc.Store.Save(ctx, cmd); err != nil {
-					level.Info(svc.logger).Log("msg", "save command in db", "err", err)
+					level.Info(svc.Logger).Log("msg", "save command in db", "err", err)
 					continue
 				}
-				level.Info(svc.logger).Log(
+				level.Info(svc.Logger).Log(
 					"msg", "queued event for device",
 					"device_udid", ev.DeviceUDID,
 					"command_uuid", ev.Payload.CommandUUID,
 					"request_type", ev.Payload.Command.RequestType,
 				)
 
-				cq := new(QueueCommandQueued)
+				cq := new(queue.QueueCommandQueued)
 				cq.DeviceUDID = ev.DeviceUDID
 				cq.CommandUUID = ev.Payload.CommandUUID
 
-				msgBytes, err := MarshalQueuedCommand(cq)
+				msgBytes, err := queue.MarshalQueuedCommand(cq)
 				if err != nil {
-					level.Info(svc.logger).Log("msg", "marshal queued command", "err", err)
+					level.Info(svc.Logger).Log("msg", "marshal queued command", "err", err)
 					continue
 				}
 
-				if err := pubsub.Publish(context.TODO(), CommandQueuedTopic, msgBytes); err != nil {
-					level.Info(svc.logger).Log("msg", "publish command to queued topic", "err", err)
+				if err := pubsub.Publish(context.TODO(), queue.CommandQueuedTopic, msgBytes); err != nil {
+					level.Info(svc.Logger).Log("msg", "publish command to queued topic", "err", err)
 				}
 			}
 		}
 	}()
 
 	return nil
-}
-
-func isNotFound(err error) bool {
-	if _, ok := err.(*NotFound); ok {
-		return true
-	}
-	return false
 }

@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/boltdb/bolt"
+	"github.com/micromdm/micromdm/platform/queue"
 	"github.com/pkg/errors"
 
 	"github.com/micromdm/micromdm/mdm"
-	"github.com/micromdm/micromdm/platform/queue"
 )
 
 type DB struct {
 	*bolt.DB
 }
+
 func NewDB(db *bolt.DB) (*DB, error) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(queue.DeviceCommandBucket))

@@ -7,7 +7,7 @@ import (
 	"github.com/micromdm/micromdm/platform/dep/sync"
 	"github.com/micromdm/micromdm/platform/device"
 	"github.com/micromdm/micromdm/platform/profile"
-	"github.com/micromdm/micromdm/platform/queue"
+	"github.com/micromdm/micromdm/platform/queue/service"
 	block "github.com/micromdm/micromdm/platform/remove"
 	scepstore "github.com/micromdm/micromdm/platform/scep"
 	"github.com/micromdm/micromdm/platform/user"
@@ -34,7 +34,7 @@ type Schema struct {
 	DeviceStore          device.Store
 	DeviceWorkerStore    device.WorkerStore
 	ProfileStore         profile.Store
-	QueueStore           queue.Store
+	QueueStore           service.Store
 	RemoveStore          block.Store
 	SCEPChallengeStore   challenge.Store
 	SCEPStore            scepstore.Store
