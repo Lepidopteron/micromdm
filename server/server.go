@@ -24,9 +24,6 @@ import (
 	"github.com/micromdm/micromdm/platform/pubsub/inmem"
 
 	"github.com/micromdm/micromdm/platform/queue"
-	queueBuiltin "github.com/micromdm/micromdm/platform/queue/builtin"
-	queueMysql "github.com/micromdm/micromdm/platform/queue/mysql"
-
 	block "github.com/micromdm/micromdm/platform/remove"
 	"github.com/micromdm/micromdm/workflow/webhook"
 )
@@ -147,29 +144,14 @@ func (c *Server) setupCommandService() error {
 }
 
 func (c *Server) setupCommandQueue(logger log.Logger) error {
-	var q queue.Queue
-	var err error
+	opts := []queue.Option{queue.WithLogger(logger)}
+	if c.NoCmdHistory {
+		opts = append(opts, queue.WithoutHistory())
+	}
 
-	if c.Datastore.ID == schema.Mysql {
-		opts := []queueMysql.Option{queueMysql.WithLogger(logger)}
-		if c.NoCmdHistory {
-			opts = append(opts, queueMysql.WithoutHistory())
-		}
-
-		q, err = queueMysql.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
-		if err != nil {
-			return err
-		}
-	} else {
-		opts := []queueBuiltin.Option{queueBuiltin.WithLogger(logger)}
-		if c.NoCmdHistory {
-			opts = append(opts, queueBuiltin.WithoutHistory())
-		}
-
-		q, err = queueBuiltin.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
-		if err != nil {
-			return err
-		}
+	q, err := queue.NewQueue(&c.Datastore.QueueStore, c.PubClient, opts...)
+	if err != nil {
+		return err
 	}
 
 	var mdmService mdm.Service
