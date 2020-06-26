@@ -16,17 +16,17 @@ import (
 func TestNext_Error(t *testing.T) {
 	svc, teardown := setupDB(t)
 	defer teardown()
-	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "zCmd"})
+	ctx := context.Background()
 	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
 
-	resp := mdm.Response{
+	resp := mdm.Response {
 		UDID:        dc.DeviceUDID,
 		CommandUUID: "xCmd",
 		Status:      "Error",
@@ -49,11 +49,11 @@ func TestNext_Error(t *testing.T) {
 func TestNext_NotNow(t *testing.T) {
 	svc, teardown := setupDB(t)
 	defer teardown()
-	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
+	ctx := context.Background()
 	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
@@ -97,12 +97,12 @@ func TestNext_NotNow(t *testing.T) {
 func TestNext_Idle(t *testing.T) {
 	svc, teardown := setupDB(t)
 	defer teardown()
-	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "xCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "yCmd"})
 	dc.Commands = append(dc.Commands, queue.Command{UUID: "zCmd"})
+	ctx := context.Background()
 	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
@@ -130,9 +130,9 @@ func TestNext_Idle(t *testing.T) {
 func TestNext_zeroCommands(t *testing.T) {
 	svc, teardown := setupDB(t)
 	defer teardown()
-	ctx := context.Background()
 
 	dc := &queue.DeviceCommand{DeviceUDID: "TestDevice"}
+	ctx := context.Background()
 	if err := svc.Store.Save(ctx, dc); err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func setupDB(t *testing.T) (*service.QueueService, func()) {
 		t.Fatalf("couldn't open bolt, err %s\n", err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(queue.DeviceCommandBucket))
+		_, err := tx.CreateBucketIfNotExists([]byte(DeviceCommandBucket))
 		return err
 	})
 	if err != nil {

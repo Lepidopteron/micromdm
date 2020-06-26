@@ -4,15 +4,13 @@ import (
 	"context"
 	"github.com/micromdm/micromdm/platform/queue/service"
 
-	//	"io/ioutil"
-//	"os"
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/dbutil"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/micromdm/micromdm/platform/queue"
+	"github.com/kolide/kit/dbutil"
 	"github.com/micromdm/micromdm/mdm"
+	"github.com/micromdm/micromdm/platform/queue"
 )
 
 func TestNext_Error(t *testing.T) {

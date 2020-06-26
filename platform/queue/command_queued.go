@@ -1,3 +1,4 @@
+// Package queue implements a BoltDB backed queue for MDM Commands.
 package queue
 
 import (
@@ -5,6 +6,10 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/micromdm/micromdm/platform/queue/internal/commandqueuedproto"
+)
+
+const (
+	CommandQueuedTopic  = "mdm.CommandQueued"
 )
 
 type QueueCommandQueued struct {
