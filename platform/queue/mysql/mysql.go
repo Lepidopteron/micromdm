@@ -86,7 +86,10 @@ func SetupDB(db *sqlx.DB) error {
 }
 
 func NewDB(db *sqlx.DB) (*DB, error) {
-	SetupDB(db)
+	err := SetupDB(db)
+	if err != nil {
+		return nil, err
+	}
 
 	return &DB{DB: db}, nil
 }
@@ -168,9 +171,10 @@ func (db *DB) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID str
 }
 
 func (db *DB) Save(ctx context.Context, cmd *queue.DeviceCommand) error {
-	SetupDB(db.DB)
-
-	var err error
+	err := SetupDB(db.DB)
+	if err != nil {
+		return err
+	}
 	
 	for i, _command := range cmd.Commands {
 		err = db.SaveCommand(ctx, _command, cmd.DeviceUDID, i)
