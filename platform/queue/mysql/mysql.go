@@ -58,6 +58,9 @@ func command_columns() []string {
 func SetupDB(db *sqlx.DB) error {
 	// Required for TIMESTAMP DEFAULT 0
 	_,err := db.Exec(`SET sql_mode = '';`)
+	if err != nil {
+		return errors.Wrap(err, "setting sql_mode")
+	}
 
 	// "github.com/micromdm/micromdm/platform/queue/internal/devicecommandproto"
 	_,err = db.Exec(`CREATE TABLE IF NOT EXISTS `+DeviceCommandTable+` (

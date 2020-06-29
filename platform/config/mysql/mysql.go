@@ -26,7 +26,10 @@ type Mysql struct{ db *sqlx.DB }
 func NewDB(db *sqlx.DB, sub pubsub.Subscriber) (*Mysql, error) {
 	// Required for TIMESTAMP DEFAULT 0
 	_,err := db.Exec(`SET sql_mode = '';`)
-	
+	if err != nil {
+		return nil, errors.Wrap(err, "setting sql_mode")
+	}
+
 	_,err = db.Exec(`CREATE TABLE IF NOT EXISTS server_config (
 			config_id INT PRIMARY KEY,
 		    push_certificate BLOB DEFAULT NULL,

@@ -28,6 +28,9 @@ func columns() []string {
 func NewDB(db *sqlx.DB) (*Mysql, error) {
 	// Required for TIMESTAMP DEFAULT 0
 	_,err := db.Exec(`SET sql_mode = '';`)
+	if err != nil {
+		return nil, errors.Wrap(err, "setting sql_mode")
+	}
 	
 	_,err = db.Exec(`CREATE TABLE IF NOT EXISTS profiles (
 			profile_id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
