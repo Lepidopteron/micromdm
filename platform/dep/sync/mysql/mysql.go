@@ -53,11 +53,11 @@ func columns() []string {
 const tableName = "cursors"
 
 func (d *Mysql) LoadCursor(ctx context.Context) (*sync.Cursor, error) {
-	
 	query, args, err := sq.StatementBuilder.
 		PlaceholderFormat(sq.Question).
 		Select(columns()...).
 		From(tableName).
+		Where(sq.Eq{"value": "(SELECT MAX(created_at) FROM " + tableName + ")"}).
 		ToSql()
 	if err != nil {
 		return nil, errors.Wrap(err, "building sql")
@@ -79,14 +79,15 @@ func (d *Mysql) SaveCursor(ctx context.Context, cursor sync.Cursor) error {
 	// Make sure we take the time offset into account for "zero" dates	
 	t := time.Now()
 	_, offset := t.Zone()
+
 	// Don't multiply by zero
-	if (offset <= 0) {
+	if offset <= 0 {
 		offset = 1
 	}
-	var min_timestamp_sec int64 = int64(offset) * 60 * 60 * 24
+	var minTimestampSec = int64(offset) * 60 * 60 * 24
 	
-	if (cursor.CreatedAt.IsZero() || cursor.CreatedAt.Unix() < min_timestamp_sec) {
-		cursor.CreatedAt = time.Unix(min_timestamp_sec, 0)
+	if cursor.CreatedAt.IsZero() || cursor.CreatedAt.Unix() < minTimestampSec {
+		cursor.CreatedAt = time.Unix(minTimestampSec, 0)
 	}
 	
 	updateQuery, argsUpdate, err := sq.StatementBuilder.
@@ -169,20 +170,17 @@ updateQuery, argsUpdate, err := sq.StatementBuilder.
 }
 
 func (d *Mysql) DeleteAutoAssigner(ctx context.Context, filter string) error {
-	fmt.Println("DeleteAutoAssigner")
 	// TODO
+	fmt.Println("TODO: DeleteAutoAssigner not implemented")
 	return nil
 }
 
 func (d *Mysql) LoadAutoAssigners(ctx context.Context) ([]sync.AutoAssigner, error) {
-	fmt.Println("LoadAutoAssigners")
+	// TODO
+	fmt.Println("TODO: LoadAutoAssigners not implemented")
 	var aa []sync.AutoAssigner
 	return aa, nil
 }
-
-
-
-
 
 type cursorNotFoundErr struct{}
 
