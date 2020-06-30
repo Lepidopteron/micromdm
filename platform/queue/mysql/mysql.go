@@ -174,18 +174,18 @@ func (db *DB) SaveCommand(ctx context.Context, cmd queue.Command, deviceUDID str
 }
 
 func (db *DB) Save(ctx context.Context, cmd *queue.DeviceCommand) error {
-	err := SetupDB(db.DB)
-	if err != nil {
-		return err
-	}
+	//err := SetupDB(db.DB)
+	//if err != nil {
+	//	return err
+	//}
 	
 	for i, _command := range cmd.Commands {
-		err = db.SaveCommand(ctx, _command, cmd.DeviceUDID, i)
+		err := db.SaveCommand(ctx, _command, cmd.DeviceUDID, i)
 		if err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func (db *DB) DeviceCommand(ctx context.Context, udid string) (*queue.DeviceCommand, error) {
