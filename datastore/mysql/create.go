@@ -31,13 +31,13 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	}
 
 	// MySQL Database
-	db, err := createDB(configMap)
+	db, err := connectDB(configMap)
 	if err != nil {
 		return nil, err
 	}
 
 	// Bolt Database used until all entities are implemented in MySQL
-	boltDB, err := createBoltDB(configMap)
+	boltDB, err := connectBoltDB(configMap)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	return &datastore, nil
 }
 
-func createDB(configMap map[string]string) (*sqlx.DB, error) {
+func connectDB(configMap map[string]string) (*sqlx.DB, error) {
 	mysqlUsername := configMap["MysqlUsername"]
 	mysqlPassword := configMap["MysqlPassword"]
 	mysqlDatabase := configMap["MysqlDatabase"]
@@ -178,7 +178,7 @@ func createDB(configMap map[string]string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func createBoltDB(configMap map[string]string) (*bolt.DB, error) {
+func connectBoltDB(configMap map[string]string) (*bolt.DB, error) {
 	configPath := configMap["ConfigPath"]
 
 	dbPath := filepath.Join(configPath, "micromdm_mysql_not_yet_implemented.db")

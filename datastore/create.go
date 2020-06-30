@@ -8,11 +8,11 @@ import (
 	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
-func Create(id schema.ImplementationID, configMap map[string]string, pubClient pubsub.PublishSubscriber) (*schema.Schema, error) {
+func Create(id schema.ImplementationID, settingsMap map[string]string, pubClient pubsub.PublishSubscriber) (*schema.Schema, error) {
 	if id == schema.Mysql {
-		return mysql.Create(configMap, pubClient)
+		return mysql.Create(settingsMap, pubClient)
 	} else if id == schema.Bolt {
-		return bolt.Create(configMap, pubClient)
+		return bolt.Create(settingsMap, pubClient)
 	}
 
 	return nil, errors.New("unrecognized datastore type: " + string(id))

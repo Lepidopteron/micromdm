@@ -27,7 +27,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	}
 
 	// Bolt Database
-	db, err := createDB(configMap)
+	db, err := connectDB(configMap)
 	if err != nil {
 		return nil, err
 	}
@@ -96,10 +96,10 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 
 	// Remove
 	removeDB, err := blockbuiltin.NewDB(db)
-	datastore.RemoveStore = removeDB
 	if err != nil {
 		return nil, err
 	}
+	datastore.RemoveStore = removeDB
 
 	// SCEP
 	scepDB, err := scepbuiltin.NewDB(db)
@@ -121,7 +121,7 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	return &datastore, nil
 }
 
-func createDB(configMap map[string]string) (*bolt.DB, error) {
+func connectDB(configMap map[string]string) (*bolt.DB, error) {
 	configPath := configMap["ConfigPath"]
 
 	dbPath := filepath.Join(configPath, "micromdm.db")

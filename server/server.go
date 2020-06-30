@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/micromdm/micromdm/datastore"
@@ -64,16 +63,7 @@ func (c *Server) Setup(logger log.Logger) error {
 		return err
 	}
 
-	configMap := map[string]string {
-		"MysqlUsername": c.MysqlUsername,
-		"MysqlPassword": c.MysqlPassword,
-		"MysqlDatabase": c.MysqlDatabase,
-		"MysqlHost": c.MysqlHost,
-		"MysqlPort": c.MysqlPort,
-		"ConfigPath": c.ConfigPath,
-	}
-
-	datastore, err := datastore.Create(c.getDatastoreID(), configMap, c.PubClient)
+	datastore, err := datastore.Create(c.getDatastoreID(), c.createSettingsMap(), c.PubClient)
 	if err != nil {
 		return err
 	}
@@ -108,6 +98,17 @@ func (c *Server) Setup(logger log.Logger) error {
 	}
 
 	return nil
+}
+
+func (s *Server) createSettingsMap() map[string]string {
+	return map[string]string{
+		"MysqlUsername": s.MysqlUsername,
+		"MysqlPassword": s.MysqlPassword,
+		"MysqlDatabase": s.MysqlDatabase,
+		"MysqlHost":     s.MysqlHost,
+		"MysqlPort":     s.MysqlPort,
+		"ConfigPath":    s.ConfigPath,
+	}
 }
 
 func (c *Server) getDatastoreID() schema.ImplementationID {
@@ -301,7 +302,6 @@ func (c *Server) setupSCEP(logger log.Logger) error {
 		return err
 	}
 
-	fmt.Println("CreateOrLoadCA")
 	_, err = c.Datastore.SCEPStore.CreateOrLoadCA(key, 5, "MicroMDM", "US")
 	if err != nil {
 		return err
