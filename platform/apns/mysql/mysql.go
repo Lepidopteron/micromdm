@@ -2,21 +2,20 @@ package mysql
 
 import (
 	"context"
-	"strings"
 	"database/sql"
+	"strings"
 
-	"github.com/pkg/errors"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	sq "gopkg.in/Masterminds/squirrel.v1"
 
 	"github.com/micromdm/micromdm/platform/apns"
-	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
 type Mysql struct{ db *sqlx.DB }
 
-func NewDB(db *sqlx.DB, sub pubsub.Subscriber) (*Mysql, error) {
+func NewDB(db *sqlx.DB) (*Mysql, error) {
 	// Required for TIMESTAMP DEFAULT 0
 	_,err := db.Exec(`SET sql_mode = '';`)
 	if err != nil {

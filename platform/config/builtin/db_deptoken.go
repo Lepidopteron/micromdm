@@ -31,7 +31,6 @@ func (db *DB) AddToken(ctx context.Context, consumerKey string, json []byte) err
 	if err != nil {
 		return err
 	}
-	err = db.Publisher.Publish(context.TODO(), config.DEPTokenTopic, json)
 	return err
 }
 

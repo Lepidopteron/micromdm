@@ -46,6 +46,10 @@ func (svc *ConfigService) ApplyDEPToken(ctx context.Context, P7MContent []byte) 
 	if err != nil {
 		return err
 	}
+	err = svc.Publisher.Publish(context.TODO(), DEPTokenTopic, tokenJSON)
+	if err != nil {
+		return err
+	}
 	fmt.Println("stored DEP token with ck", depToken.ConsumerKey)
 	return nil
 }

@@ -96,14 +96,14 @@ func Create(configMap map[string]string, pubClient pubsub.PublishSubscriber) (*s
 	datastore.DEPSyncWatcherStore = depSyncDB
 
 	// Config
-	configDB, err := configmysql.NewDB(db, pubClient)
+	configDB, err := configmysql.NewDB(db)
 	if err != nil {
 		return nil, err
 	}
 	datastore.ConfigStore = configDB
 
 	// Push Notification, APNS
-	apnsStore, err := apnsmysql.NewDB(db, pubClient)
+	apnsStore, err := apnsmysql.NewDB(db)
 	if err != nil {
 		return nil, err
 	}

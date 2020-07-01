@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/micromdm/micromdm/platform/apns"
-	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
 const PushBucket = "mdm.PushInfo"
@@ -17,7 +16,7 @@ type DB struct {
 	*bolt.DB
 }
 
-func NewDB(db *bolt.DB, sub pubsub.Subscriber) (*DB, error) {
+func NewDB(db *bolt.DB) (*DB, error) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(PushBucket))
 		return err

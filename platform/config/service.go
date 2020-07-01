@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
 type Service interface {
@@ -26,8 +27,9 @@ type Store interface {
 
 type ConfigService struct {
 	store Store
+	Publisher pubsub.Publisher
 }
 
-func New(store Store) *ConfigService {
-	return &ConfigService{store: store}
+func New(store Store, pub pubsub.Publisher) *ConfigService {
+	return &ConfigService{store: store, Publisher: pub}
 }

@@ -12,7 +12,6 @@ import (
 
 	"github.com/micromdm/micromdm/pkg/crypto"
 	"github.com/micromdm/micromdm/platform/config"
-	"github.com/micromdm/micromdm/platform/pubsub"
 )
 
 const (
@@ -22,15 +21,14 @@ const (
 // DB stores server configuration in BoltDB
 type DB struct {
 	*bolt.DB
-	Publisher pubsub.Publisher
 }
 
-func NewDB(db *bolt.DB, pub pubsub.Publisher) (*DB, error) {
+func NewDB(db *bolt.DB) (*DB, error) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(ConfigBucket))
 		return err
 	})
-	store := &DB{DB: db, Publisher: pub}
+	store := &DB{DB: db}
 	return store, err
 }
 
@@ -55,10 +53,6 @@ func (db *DB) SavePushCertificate(ctx context.Context, cert []byte, key []byte) 
 		return errors.Wrap(err, "save ServerConfig in bucket")
 	}
 	if err = tx.Commit(); err != nil {
-		return err
-	}
-
-	if err := db.Publisher.Publish(context.TODO(), config.ConfigTopic, []byte("updated")); err != nil {
 		return err
 	}
 	return err

@@ -11,6 +11,9 @@ import (
 
 func (svc *ConfigService) SavePushCertificate(ctx context.Context, cert []byte, key []byte) error {
 	err := svc.store.SavePushCertificate(ctx, cert, key)
+	if err := svc.Publisher.Publish(context.TODO(), ConfigTopic, []byte("updated")); err != nil {
+		return err
+	}
 	return errors.Wrap(err, "save push certificate")
 }
 

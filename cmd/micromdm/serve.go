@@ -227,7 +227,7 @@ func serve(args []string) error {
 	if *flAPIKey != "" {
 		basicAuthEndpointMiddleware := basic.AuthMiddleware("micromdm", *flAPIKey, "micromdm")
 
-		configsvc := config.New(sm.Datastore.ConfigStore)
+		configsvc := config.New(sm.Datastore.ConfigStore, sm.PubClient)
 		configEndpoints := config.MakeServerEndpoints(configsvc, basicAuthEndpointMiddleware)
 		config.RegisterHTTPHandlers(r, configEndpoints, options...)
 
