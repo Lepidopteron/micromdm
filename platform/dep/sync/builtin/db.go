@@ -1,10 +1,8 @@
 package builtin
 
 import (
-	"encoding/json"
 	"context"
-	"fmt"
-
+	"encoding/json"
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 
@@ -52,7 +50,7 @@ func (db *DB) LoadCursor(ctx context.Context) (*sync.Cursor, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "load cursor from bolt")
 	}
-	fmt.Println(cursor.Cursor)
+	//fmt.Println(cursor.Cursor)
 	return &cursor.Cursor, nil
 }
 
